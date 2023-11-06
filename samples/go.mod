@@ -9,7 +9,7 @@ require (
 	cloud.google.com/go/spanner v1.51.1-0.20231030142734-7abc3595e9cc
 	github.com/docker/docker v24.0.7+incompatible
 	github.com/docker/go-connections v0.4.0
-	github.com/googleapis/go-gorm-spanner v0.0.0-00010101000000-000000000000
+	github.com/googleapis/go-gorm-spanner v0.0.0-20231104053359-324586745178
 	github.com/googleapis/go-sql-spanner v1.1.2-0.20231030143945-51f013b57cce
 	github.com/stretchr/testify v1.8.4
 	gorm.io/gorm v1.25.5
