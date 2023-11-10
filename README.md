@@ -36,6 +36,23 @@ for s := range singers {
 }
 ```
 
+### Connection URL Properties
+
+The Cloud Spanner GORM supports the following connection URL properties
+
+#### Commonly Used Properties
+- credentials (String): File name for the credentials to use. The connection will use the default credentials of the environment if no credentials file is specified in the connection string. Example: `projects/my-project/instances/my-instance/databases/my-db;credentials=/path/to/credentials.json`
+- usePlainText (boolean): : Boolean that indicates whether the connection should use plain text communication or not. Set this to true to connect to local mock servers that do not use SSL. Example: `projects/test-project/instances/test-instance/databases/test-db;usePlainText=true`
+- optimizerVersion (String): Sets the default query optimizer version to use for this connection. See also https://cloud.google.com/spanner/docs/query-optimizer/query-optimizer-versions.
+
+#### Advanced Properties
+- minSessions (int): Sets the minimum number of sessions in the backing session pool. Defaults to 100.
+- maxSessions (int): Sets the maximum number of sessions in the backing session pool. Defaults to 400.
+- numChannels (int): Sets the number of gRPC channels to use. Defaults to 4.
+- retryAbortsInternally (boolean): Boolean that indicates whether the connection should automatically retry aborted errors. The default is true.
+- disableRouteToLeader (boolean): Boolean that indicates if all the requests of type read-write and PDML need to be routed to the leader region. The default is false.
+
+
 ## Emulator
 
 See the [Google Cloud Spanner Emulator](https://cloud.google.com/spanner/docs/emulator) support to learn how to start the emulator.
