@@ -42,6 +42,11 @@ type spannerMigrator struct {
 	Dialector
 }
 
+type spannerColumnType struct {
+	migrator.ColumnType
+	GenerationExpression sql.NullString
+}
+
 func (m spannerMigrator) CurrentDatabase() (name string) {
 	return ""
 }
@@ -225,6 +230,23 @@ func (m spannerMigrator) DropIndex(value interface{}, name string) error {
 	})
 }
 
+func (m spannerMigrator) AlterColumn(value interface{}, field string) error {
+	// Do not automatically modify generated columns.
+	if m.isColumnGenerated(value, field) {
+		return nil
+	}
+	return m.RunWithValue(value, func(stmt *gorm.Statement) error {
+		if field := stmt.Schema.LookUpField(field); field != nil {
+			fullType := m.FullDataTypeOf(field)
+			return m.DB.Exec(
+				"ALTER TABLE ? ALTER COLUMN ? ?",
+				m.CurrentTable(stmt), clause.Column{Name: field.DBName}, fullType,
+			).Error
+		}
+		return fmt.Errorf("failed to look up field with name: %s", field)
+	})
+}
+
 // ColumnTypes column types return columnTypes,error
 func (m spannerMigrator) ColumnTypes(value interface{}) ([]gorm.ColumnType, error) {
 	columnTypes := make([]gorm.ColumnType, 0)
@@ -238,6 +260,8 @@ func (m spannerMigrator) ColumnTypes(value interface{}) ([]gorm.ColumnType, erro
 						INNER JOIN INFORMATION_SCHEMA.INDEX_COLUMNS IC USING (TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME, INDEX_NAME)
 						WHERE IC.TABLE_CATALOG=C.TABLE_CATALOG AND IC.TABLE_SCHEMA=IC.TABLE_SCHEMA AND IC.COLUMN_NAME=C.COLUMN_NAME
 						  AND I.IS_UNIQUE
+						ORDER BY I.INDEX_TYPE
+						LIMIT 1
 					   ) AS KEY,
                     `
 		rows, err := m.DB.Session(&gorm.Session{}).Table(stmt.Table).Limit(1).Rows()
@@ -253,7 +277,8 @@ func (m spannerMigrator) ColumnTypes(value interface{}) ([]gorm.ColumnType, erro
 		}
 
 		columnTypeSQL += "FROM INFORMATION_SCHEMA.COLUMNS C WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION"
-		columns, rowErr := m.DB.Table(stmt.Table).Raw(columnTypeSQL, m.CurrentDatabase(), stmt.Table).Rows()
+		currentDatabase := m.CurrentDatabase()
+		columns, rowErr := m.DB.Table(stmt.Table).Raw(columnTypeSQL, &currentDatabase, &stmt.Table).Rows()
 		if rowErr != nil {
 			return rowErr
 		}
@@ -296,6 +321,24 @@ func (m spannerMigrator) ColumnTypes(value interface{}) ([]gorm.ColumnType, erro
 	})
 
 	return columnTypes, err
+}
+
+func (m spannerMigrator) isColumnGenerated(value interface{}, field string) bool {
+	var count int64
+	m.RunWithValue(value, func(stmt *gorm.Statement) error {
+		currentDatabase := m.DB.Migrator().CurrentDatabase()
+		name := field
+		if field := stmt.Schema.LookUpField(field); field != nil {
+			name = field.DBName
+		}
+
+		return m.DB.Raw(
+			"SELECT count(*) FROM INFORMATION_SCHEMA.columns WHERE table_schema = ? AND table_name = ? AND column_name = ? AND generation_expression IS NOT NULL",
+			currentDatabase, stmt.Table, name,
+		).Row().Scan(&count)
+	})
+
+	return count > 0
 }
 
 func buildConstraint(constraint *schema.Constraint) (sql string, results []interface{}) {
