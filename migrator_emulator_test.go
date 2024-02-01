@@ -135,6 +135,7 @@ func verifyDatabaseSchema(t *testing.T, dsn string) {
 	if g, w := len(resp.GetStatements()), 15; g != w {
 		t.Errorf("ddl statement count mismatch\n Got: %v\nWant: %v", g, w)
 	}
+	altCreateConcerts := "CREATE TABLE concerts (\n  id INT64 DEFAULT (GET_NEXT_SEQUENCE_VALUE(Sequence concerts_seq)),\n  created_at TIMESTAMP,\n  updated_at TIMESTAMP,\n  deleted_at TIMESTAMP,\n  name STRING(MAX),\n  venue_id INT64,\n  singer_id INT64,\n  start_time TIMESTAMP,\n  end_time TIMESTAMP,\n  CONSTRAINT fk_singers_concerts FOREIGN KEY(singer_id) REFERENCES singers(id),\n  CONSTRAINT fk_venues_concerts FOREIGN KEY(venue_id) REFERENCES venues(id),\n) PRIMARY KEY(id)"
 	for i, ddl := range []string{
 		"CREATE SEQUENCE singers_seq OPTIONS (\n  sequence_kind = 'bit_reversed_positive' )",
 		"CREATE SEQUENCE albums_seq OPTIONS (\n  sequence_kind = 'bit_reversed_positive' )",
@@ -153,6 +154,11 @@ func verifyDatabaseSchema(t *testing.T, dsn string) {
 		"CREATE INDEX idx_concerts_deleted_at ON concerts(deleted_at)",
 	} {
 		if g, w := resp.GetStatements()[i], ddl; g != w {
+			// Workaround for the fact that the DDL printer prints constraints in non-deterministic order.
+			// That means that the result for CREATE TABLE concerts could be one of two variants.
+			if i == 13 && g == altCreateConcerts {
+				continue
+			}
 			t.Errorf("%d: ddl mismatch\n Got: %v\nWant: %v", i, g, w)
 		}
 	}
