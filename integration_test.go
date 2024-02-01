@@ -101,6 +101,10 @@ func TestIntegration_DefaultValue(t *testing.T) {
 
 func TestIntegration_Distinct(t *testing.T) {
 	skipIfShort(t)
+	if testutil.RunsOnEmulator() {
+		t.Skip("ON DELETE CASCADE is not supported on the emulator")
+	}
+
 	t.Parallel()
 	dsn, cleanup, err := testutil.CreateTestDB(context.Background())
 	if err != nil {
