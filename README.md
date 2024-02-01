@@ -95,63 +95,12 @@ The Cloud Spanner `gorm` dialect has the following known limitations:
 
 | Limitation                                                                                     | Workaround                                                                                                                                                                                                             |
 |------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| OnConflict                                                                                     | OnConflict clauses are not supported                                                                                                                                                                                   |
 | Nested transactions                                                                            | Nested transactions and savepoints are not supported. It is therefore recommended to set the configuration option `DisableNestedTransaction: true,`                                                                    |
 | Locking                                                                                        | Lock clauses (e.g. `clause.Locking{Strength: "UPDATE"}`) are not supported. These are generally speaking also not required, as the default isolation level that is used by Cloud Spanner is serializable.              |
-| Auto-save associations                                                                         | Auto saved associations are not supported, as these will automatically use an OnConflict clause                                                                                                                        |
 | [gorm.Automigrate](https://gorm.io/docs/migration.html#Auto-Migration) with interleaved tables | [Interleaved tables](samples/interleave) are supported by the Cloud Spanner `gorm` dialect, but Auto-Migration does not support interleaved tables. It is therefore recommended to create interleaved tables manually. |
 | [Cloud Spanner stale reads](https://cloud.google.com/spanner/docs/reads#go)                    | Stale reads are not supported by gorm.                                                                                                                                                                                 |    
 
 For the complete list of the limitations, see the [Cloud Spanner GORM limitations](https://github.com/googleapis/go-gorm-spanner/blob/main/docs/limitations.md).
-
-### OnConflict Clauses
-`OnConflict` clauses are not supported by Cloud Spanner and should not be used. The following will
-therefore not work.
-
-```go
-user := User{
-    ID:   1,
-    Name: "User Name",
-}
-// OnConflict is not supported and this will return an error.
-db.Clauses(clause.OnConflict{DoNothing: true}).Create(&user)
-```
-
-### Auto-save Associations
-Auto-saving associations will automatically use an `OnConflict` clause in gorm. These are not
-supported. Instead, the parent entity of the association must be created before the child entity is
-created.
-
-```go
-blog := Blog{
-    ID:     1,
-    Name:   "",
-    UserID: 1,
-    User: User{
-        ID:   1,
-        Name: "User Name",
-    },
-}
-// This will fail, as the insert statement for User will use an OnConflict clause.
-db.Create(&blog).Error
-```
-
-Instead, do the following:
-
-```go
-user := User{
-    ID:   1,
-    Name: "User Name",
-    Age:  20,
-}
-blog := Blog{
-    ID:     1,
-    Name:   "",
-    UserID: 1,
-}
-db.Create(&user)
-db.Create(&blog)
-```
 
 ### Nested Transactions
 `gorm` uses savepoints for nested transactions. Savepoints are currently not supported by Cloud Spanner. Nested

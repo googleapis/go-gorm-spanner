@@ -85,14 +85,44 @@ func (dialector Dialector) Initialize(db *gorm.DB) (err error) {
 		}
 	}
 
-	// Spanner DML does not support 'ON CONFLICT' clauses.
-	db.ClauseBuilders[clause.OnConflict{}.Name()] = func(c clause.Clause, builder clause.Builder) {}
+	db.ClauseBuilders[clause.Insert{}.Name()] = insertHandler
 	db.ClauseBuilders[clause.Returning{}.Name()] = func(c clause.Clause, builder clause.Builder) {
 		// TODO: check if we can improve this be returning only required columns.
-		builder.WriteString("THEN RETURN *")
+		_, _ = builder.WriteString("THEN RETURN *")
 	}
 
 	return
+}
+
+func insertHandler(c clause.Clause, builder clause.Builder) {
+	insert, ok := c.Expression.(clause.Insert)
+	if !ok {
+		c.Build(builder)
+		return
+	}
+	stmt, ok := builder.(*gorm.Statement)
+	if !ok {
+		c.Build(builder)
+		return
+	}
+	onConflictClause, ok := stmt.Clauses[clause.OnConflict{}.Name()]
+	if !ok {
+		c.Build(builder)
+		return
+	}
+
+	onConflict, ok := onConflictClause.Expression.(clause.OnConflict)
+	if onConflict.OnConstraint != "" || onConflict.TargetWhere.Exprs != nil || onConflict.Where.Exprs != nil || !(onConflict.UpdateAll || onConflict.DoNothing) {
+		_ = builder.AddError(fmt.Errorf("spanner only supports UpdateAll or DoNothing for OnConflict clauses"))
+		return
+	}
+
+	if onConflict.UpdateAll {
+		insert.Modifier = "INSERT OR UPDATE"
+	} else if onConflict.DoNothing {
+		insert.Modifier = "INSERT OR IGNORE"
+	}
+	insert.Build(builder)
 }
 
 func BeforeUpdate(db *gorm.DB) {
