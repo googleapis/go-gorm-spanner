@@ -7,10 +7,12 @@ require (
 	cloud.google.com/go/spanner v1.51.1-0.20231030142734-7abc3595e9cc
 	github.com/golang/protobuf v1.5.3
 	github.com/googleapis/go-sql-spanner v1.1.2-0.20231030143945-51f013b57cce
+	github.com/shopspring/decimal v1.3.1
 	github.com/stretchr/testify v1.8.4
 	google.golang.org/api v0.148.0
 	google.golang.org/grpc v1.59.0
 	google.golang.org/protobuf v1.31.0
+	gorm.io/datatypes v1.2.0
 	gorm.io/gorm v1.25.5
 )
 
@@ -26,6 +28,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/envoyproxy/go-control-plane v0.11.1 // indirect
 	github.com/envoyproxy/protoc-gen-validate v1.0.2 // indirect
+	github.com/go-sql-driver/mysql v1.7.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/google/s2a-go v0.1.7 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.1 // indirect
@@ -46,4 +49,5 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20231002182017-d307bd883b97 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20231012201019-e917dd12ba7a // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
+	gorm.io/driver/mysql v1.4.7 // indirect
 )

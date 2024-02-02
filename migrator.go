@@ -42,6 +42,15 @@ type spannerMigrator struct {
 	Dialector
 }
 
+type spannerColumnType struct {
+	migrator.ColumnType
+	GenerationExpression sql.NullString
+}
+
+func (m spannerMigrator) CurrentDatabase() (name string) {
+	return ""
+}
+
 func (m spannerMigrator) AutoMigrate(values ...interface{}) error {
 	if !m.Dialector.Config.DisableAutoMigrateBatching {
 		if err := m.StartBatchDDL(); err != nil {
@@ -91,6 +100,7 @@ func (m spannerMigrator) FullDataTypeOf(field *schema.Field) (expr clause.Expr) 
 
 	return
 }
+
 func (m spannerMigrator) CreateTable(values ...interface{}) error {
 	for _, value := range m.ReorderModels(values, false) {
 		tx := m.DB.Session(&gorm.Session{})
@@ -193,6 +203,23 @@ func (m spannerMigrator) DropTable(values ...interface{}) error {
 	return nil
 }
 
+func (m spannerMigrator) HasIndex(value interface{}, name string) bool {
+	var count int64
+	m.RunWithValue(value, func(stmt *gorm.Statement) error {
+		currentDatabase := m.DB.Migrator().CurrentDatabase()
+		if idx := stmt.Schema.LookIndex(name); idx != nil {
+			name = idx.Name
+		}
+
+		return m.DB.Raw(
+			"SELECT count(*) FROM information_schema.indexes WHERE table_schema = ? AND table_name = ? AND index_name = ?",
+			currentDatabase, stmt.Table, name,
+		).Row().Scan(&count)
+	})
+
+	return count > 0
+}
+
 func (m spannerMigrator) DropIndex(value interface{}, name string) error {
 	return m.RunWithValue(value, func(stmt *gorm.Statement) error {
 		if idx := stmt.Schema.LookIndex(name); idx != nil {
@@ -203,33 +230,55 @@ func (m spannerMigrator) DropIndex(value interface{}, name string) error {
 	})
 }
 
+func (m spannerMigrator) AlterColumn(value interface{}, field string) error {
+	// Do not automatically modify generated columns.
+	if m.isColumnGenerated(value, field) {
+		return nil
+	}
+	return m.RunWithValue(value, func(stmt *gorm.Statement) error {
+		if field := stmt.Schema.LookUpField(field); field != nil {
+			fullType := m.FullDataTypeOf(field)
+			return m.DB.Exec(
+				"ALTER TABLE ? ALTER COLUMN ? ?",
+				m.CurrentTable(stmt), clause.Column{Name: field.DBName}, fullType,
+			).Error
+		}
+		return fmt.Errorf("failed to look up field with name: %s", field)
+	})
+}
+
 // ColumnTypes column types return columnTypes,error
 func (m spannerMigrator) ColumnTypes(value interface{}) ([]gorm.ColumnType, error) {
 	columnTypes := make([]gorm.ColumnType, 0)
 	err := m.RunWithValue(value, func(stmt *gorm.Statement) error {
-		var (
-			table         = stmt.Table
-			columnTypeSQL = "SELECT column_name, column_default, is_nullable = 'YES', data_type, character_maximum_length, column_type, column_key, extra, column_comment, numeric_precision, numeric_scale "
-			rows, err     = m.DB.Session(&gorm.Session{}).Table(table).Limit(1).Rows()
-		)
-
+		columnTypeSQL := `
+				SELECT COLUMN_NAME, COLUMN_DEFAULT, IS_NULLABLE = 'YES',
+					   REGEXP_REPLACE(SPANNER_TYPE, '\\(.*\\)', '') AS DATA_TYPE,
+					   SAFE_CAST(REPLACE(REPLACE(REGEXP_EXTRACT(SPANNER_TYPE, '\\(.*\\)'), '(', ''), ')', '') AS INT64) AS COLUMN_LENGTH,
+					   (SELECT IF(I.INDEX_TYPE='PRIMARY_KEY', 'PRI', 'UNI')
+						FROM INFORMATION_SCHEMA.INDEXES I
+						INNER JOIN INFORMATION_SCHEMA.INDEX_COLUMNS IC USING (TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME, INDEX_NAME)
+						WHERE IC.TABLE_CATALOG=C.TABLE_CATALOG AND IC.TABLE_SCHEMA=IC.TABLE_SCHEMA AND IC.COLUMN_NAME=C.COLUMN_NAME
+						  AND I.IS_UNIQUE
+						ORDER BY I.INDEX_TYPE
+						LIMIT 1
+					   ) AS KEY,
+                    `
+		rows, err := m.DB.Session(&gorm.Session{}).Table(stmt.Table).Limit(1).Rows()
 		if err != nil {
 			return err
 		}
-
 		rawColumnTypes, err := rows.ColumnTypes()
-
 		if err != nil {
 			return err
 		}
-
 		if err := rows.Close(); err != nil {
 			return err
 		}
 
-		columnTypeSQL += "FROM information_schema.columns WHERE table_name = ? ORDER BY ORDINAL_POSITION"
-
-		columns, rowErr := m.DB.Table(table).Raw(columnTypeSQL, table).Rows()
+		columnTypeSQL += "FROM INFORMATION_SCHEMA.COLUMNS C WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION"
+		currentDatabase := m.CurrentDatabase()
+		columns, rowErr := m.DB.Table(stmt.Table).Raw(columnTypeSQL, &currentDatabase, &stmt.Table).Rows()
 		if rowErr != nil {
 			return rowErr
 		}
@@ -238,14 +287,12 @@ func (m spannerMigrator) ColumnTypes(value interface{}) ([]gorm.ColumnType, erro
 
 		for columns.Next() {
 			var (
-				column     migrator.ColumnType
-				extraValue sql.NullString
-				columnKey  sql.NullString
-				values     = []interface{}{
-					&column.NameValue, &column.DefaultValueValue, &column.NullableValue, &column.DataTypeValue, &column.LengthValue, &column.ColumnTypeValue, &columnKey, &extraValue, &column.CommentValue, &column.DecimalSizeValue, &column.ScaleValue,
+				column    migrator.ColumnType
+				columnKey sql.NullString
+				values    = []interface{}{
+					&column.NameValue, &column.DefaultValueValue, &column.NullableValue, &column.DataTypeValue, &column.LengthValue, &columnKey,
 				}
 			)
-
 			if scanErr := columns.Scan(values...); scanErr != nil {
 				return scanErr
 			}
@@ -258,11 +305,6 @@ func (m spannerMigrator) ColumnTypes(value interface{}) ([]gorm.ColumnType, erro
 			case "UNI":
 				column.UniqueValue = sql.NullBool{Bool: true, Valid: true}
 			}
-
-			if strings.Contains(extraValue.String, "auto_increment") {
-				column.AutoIncrementValue = sql.NullBool{Bool: true, Valid: true}
-			}
-
 			column.DefaultValueValue.String = strings.Trim(column.DefaultValueValue.String, "'")
 
 			for _, c := range rawColumnTypes {
@@ -279,6 +321,24 @@ func (m spannerMigrator) ColumnTypes(value interface{}) ([]gorm.ColumnType, erro
 	})
 
 	return columnTypes, err
+}
+
+func (m spannerMigrator) isColumnGenerated(value interface{}, field string) bool {
+	var count int64
+	m.RunWithValue(value, func(stmt *gorm.Statement) error {
+		currentDatabase := m.DB.Migrator().CurrentDatabase()
+		name := field
+		if field := stmt.Schema.LookUpField(field); field != nil {
+			name = field.DBName
+		}
+
+		return m.DB.Raw(
+			"SELECT count(*) FROM INFORMATION_SCHEMA.columns WHERE table_schema = ? AND table_name = ? AND column_name = ? AND generation_expression IS NOT NULL",
+			currentDatabase, stmt.Table, name,
+		).Row().Scan(&count)
+	})
+
+	return count > 0
 }
 
 func buildConstraint(constraint *schema.Constraint) (sql string, results []interface{}) {

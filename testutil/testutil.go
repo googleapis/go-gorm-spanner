@@ -49,7 +49,7 @@ func init() {
 	}
 }
 
-func runsOnEmulator() bool {
+func RunsOnEmulator() bool {
 	if _, ok := os.LookupEnv("SPANNER_EMULATOR_HOST"); ok {
 		return true
 	}
