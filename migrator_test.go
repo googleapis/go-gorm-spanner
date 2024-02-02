@@ -226,10 +226,6 @@ func putSingerColDetailsResult(server *testutil.MockedSpannerInMemTestServer, sq
 					},
 				},
 			},
-			//{Type: &spannerpb.Type{Code: spannerpb.TypeCode_STRING}, Name: "first_name"},
-			//{Type: &spannerpb.Type{Code: spannerpb.TypeCode_STRING}, Name: "last_name"},
-			//{Type: &spannerpb.Type{Code: spannerpb.TypeCode_STRING}, Name: "full_name"},
-			//{Type: &spannerpb.Type{Code: spannerpb.TypeCode_BOOL}, Name: "active"},
 			Rows: []*structpb.ListValue{
 				{Values: []*structpb.Value{
 					{Kind: &structpb.Value_StringValue{StringValue: "id"}},
