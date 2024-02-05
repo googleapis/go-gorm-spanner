@@ -185,3 +185,44 @@ func TestIntegration_Distinct(t *testing.T) {
 		t.Fatalf("Build Distinct with u.*, but got %v", r.Statement.SQL.String())
 	}
 }
+
+func TestIntegration_CommitTimestamp(t *testing.T) {
+	skipIfShort(t)
+	t.Parallel()
+
+	dsn, cleanup, err := testutil.CreateTestDB(context.Background())
+	if err != nil {
+		log.Fatalf("could not init integration tests while creating database: %v", err)
+	}
+	defer cleanup()
+	db, err := gorm.Open(New(Config{
+		DriverName: "spanner",
+		DSN:        dsn,
+	}), &gorm.Config{PrepareStmt: true})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	type Singer struct {
+		gorm.Model
+
+		Name        string
+		LastUpdated CommitTimestamp
+	}
+
+	if err := db.AutoMigrate(&Singer{}); err != nil {
+		t.Fatalf("Failed to migrate with default value, got error: %v", err)
+	}
+
+	singer := Singer{Name: "Some Singer"}
+	if err := db.Create(&singer).Error; err != nil {
+		t.Fatalf("failed to create singer: %v", err)
+	}
+	// Verify that both an ID and a commit timestamp was generated and returned for the singer.
+	if singer.ID == 0 {
+		t.Fatalf("no ID returned for singer")
+	}
+	if !singer.LastUpdated.Timestamp.Valid {
+		t.Fatalf("no commit timestamp returned for singer")
+	}
+}
