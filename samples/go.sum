@@ -86,6 +86,8 @@ github.com/googleapis/gax-go/v2 v2.12.0 h1:A+gCJKdRfqXkr+BIRGtZLibNXf0m1f9E4HG56
 github.com/googleapis/gax-go/v2 v2.12.0/go.mod h1:y+aIqrI5eb1YGMVJfuV3185Ts/D7qKpsEkdD5+I6QGU=
 github.com/googleapis/go-sql-spanner v1.1.2-0.20231030143945-51f013b57cce h1:xsX9lLStXIt5KBmzcHW1yGl1ehVIE6s6LWce2E/UCAY=
 github.com/googleapis/go-sql-spanner v1.1.2-0.20231030143945-51f013b57cce/go.mod h1:e12AKZmltQH/2XGqR/2SAPWPKshc5+WF4W7OGD9YcAw=
+github.com/googleapis/go-sql-spanner v1.1.2-0.20240115063302-4aa18f64cabe h1:gAQ3lJqbkuMd2mz3UFEK5nMIkXGSX4xKwLGpPPtKp74=
+github.com/googleapis/go-sql-spanner v1.1.2-0.20240115063302-4aa18f64cabe/go.mod h1:e12AKZmltQH/2XGqR/2SAPWPKshc5+WF4W7OGD9YcAw=
 github.com/jinzhu/inflection v1.0.0 h1:K317FqzuhWc8YvSVlFMCCUb36O/S9MCKRDI7QkRKD/E=
 github.com/jinzhu/inflection v1.0.0/go.mod h1:h+uFLlag+Qp1Va5pdKtLDYj+kHp5pxUVkryuEj+Srlc=
 github.com/jinzhu/now v1.1.5 h1:/o9tlHleP7gOFmsnYNz3RGnqzefHA47wQpKrrdTIwXQ=
