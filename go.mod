@@ -5,7 +5,7 @@ go 1.19
 require (
 	cloud.google.com/go/longrunning v0.5.5
 	cloud.google.com/go/spanner v1.56.0
-	github.com/googleapis/go-sql-spanner v1.2.0
+	github.com/googleapis/go-sql-spanner v1.2.1
 	github.com/shopspring/decimal v1.3.1
 	github.com/stretchr/testify v1.8.4
 	google.golang.org/api v0.161.0

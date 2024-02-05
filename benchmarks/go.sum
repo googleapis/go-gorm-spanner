@@ -82,8 +82,8 @@ github.com/googleapis/enterprise-certificate-proxy v0.3.2 h1:Vie5ybvEvT75RniqhfF
 github.com/googleapis/enterprise-certificate-proxy v0.3.2/go.mod h1:VLSiSSBs/ksPL8kq3OBOQ6WRI2QnaFynd1DCjZ62+V0=
 github.com/googleapis/gax-go/v2 v2.12.0 h1:A+gCJKdRfqXkr+BIRGtZLibNXf0m1f9E4HG56etFpas=
 github.com/googleapis/gax-go/v2 v2.12.0/go.mod h1:y+aIqrI5eb1YGMVJfuV3185Ts/D7qKpsEkdD5+I6QGU=
-github.com/googleapis/go-sql-spanner v1.2.0 h1:TEOylhdo+5KoknrgCUVpTGlTv56eHQIttw/hBVnxiZM=
-github.com/googleapis/go-sql-spanner v1.2.0/go.mod h1:EO01M66RcAXdgxLKipnNwjEQKO1mEBsp42YsWRB3EFU=
+github.com/googleapis/go-sql-spanner v1.2.1 h1:YX7RrtPfFKn5enizPTRoULuBjDA+3Zv02OW2pBBeTGI=
+github.com/googleapis/go-sql-spanner v1.2.1/go.mod h1:EO01M66RcAXdgxLKipnNwjEQKO1mEBsp42YsWRB3EFU=
 github.com/jackc/pgpassfile v1.0.0 h1:/6Hmqy13Ss2zCq62VdNG8tM1wchn8zjSGOBJ6icpsIM=
 github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a h1:bbPeKD0xmW/Y25WS6cokEszi5g+S0QxI/d45PkRi7Nk=
 github.com/jackc/pgx/v5 v5.3.0 h1:/NQi8KHMpKWHInxXesC8yD4DhkXPrVhmnwYkjp9AmBA=
