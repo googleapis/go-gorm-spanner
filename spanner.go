@@ -88,8 +88,19 @@ func (dialector Dialector) Initialize(db *gorm.DB) (err error) {
 	// Spanner DML does not support 'ON CONFLICT' clauses.
 	db.ClauseBuilders[clause.OnConflict{}.Name()] = func(c clause.Clause, builder clause.Builder) {}
 	db.ClauseBuilders[clause.Returning{}.Name()] = func(c clause.Clause, builder clause.Builder) {
-		// TODO: check if we can improve this be returning only required columns.
-		builder.WriteString("THEN RETURN *")
+		builder.WriteString("THEN RETURN ")
+		returning, ok := c.Expression.(clause.Returning)
+		if ok && len(returning.Columns) > 0 {
+			for idx, column := range returning.Columns {
+				if idx > 0 {
+					builder.WriteByte(',')
+				}
+
+				builder.WriteQuoted(column)
+			}
+		} else {
+			builder.WriteByte('*')
+		}
 	}
 
 	return

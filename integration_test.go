@@ -247,11 +247,21 @@ func TestIntegration_CommitTimestamp(t *testing.T) {
 	if err := db.Create(&singer).Error; err != nil {
 		t.Fatalf("failed to create singer: %v", err)
 	}
-	// Verify that both an ID and a commit timestamp was generated and returned for the singer.
+	// Verify that an ID and a commit timestamp was generated for the singer.
+	// The ID is returned as part of the INSERT statement.
+	// The commit timestamp is only returned after the commit, meaning that we have to re-fetch the singer from the
+	// database before we see it.
 	if singer.ID == 0 {
 		t.Fatalf("no ID returned for singer")
 	}
+	if singer.LastUpdated.Timestamp.Valid {
+		t.Fatalf("unexpected commit timestamp returned for singer")
+	}
+
+	if err := db.Find(&singer, singer.ID).Error; err != nil {
+		t.Fatalf("failed to find singer: %v", err)
+	}
 	if !singer.LastUpdated.Timestamp.Valid {
-		t.Fatalf("no commit timestamp returned for singer")
+		t.Fatalf("missing commit timestamp for singer")
 	}
 }

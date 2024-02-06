@@ -20,7 +20,6 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 	"strconv"
 	"testing"
-	"time"
 )
 
 type singerWithCommitTimestamp struct {
@@ -42,13 +41,12 @@ func TestCommitTimestamp(t *testing.T) {
 		FirstName: "First",
 		LastName:  "Last",
 	}
-	_ = putSingerResult(server, "INSERT INTO `singers` (`first_name`,`last_name`,`last_updated`) VALUES (@p1,@p2,PENDING_COMMIT_TIMESTAMP()) THEN RETURN *", s)
+	_ = putSingerResult(server, "INSERT INTO `singers` (`first_name`,`last_name`,`last_updated`) VALUES (@p1,@p2,PENDING_COMMIT_TIMESTAMP()) THEN RETURN `id`", s)
 	if err := db.Create(&s).Error; err != nil {
 		t.Fatalf("failed to create singer: %v", err)
 	}
-	cs, _ := time.Parse(time.RFC3339, "2024-02-05T17:17:00Z")
-	if g, w := s.LastUpdated.Timestamp.Time, cs; g != w {
-		t.Fatalf("commit timestamp mismatch\n Got: %v\nWant: %v", g, w)
+	if s.LastUpdated.Timestamp.Valid {
+		t.Fatalf("unexpected commit timestamp returned from insert")
 	}
 }
 
@@ -60,18 +58,12 @@ func putSingerResult(server *testutil.MockedSpannerInMemTestServer, sql string, 
 				RowType: &spannerpb.StructType{
 					Fields: []*spannerpb.StructType_Field{
 						{Type: &spannerpb.Type{Code: spannerpb.TypeCode_INT64}, Name: "ID"},
-						{Type: &spannerpb.Type{Code: spannerpb.TypeCode_STRING}, Name: "first_name"},
-						{Type: &spannerpb.Type{Code: spannerpb.TypeCode_STRING}, Name: "last_name"},
-						{Type: &spannerpb.Type{Code: spannerpb.TypeCode_TIMESTAMP}, Name: "last_updated"},
 					},
 				},
 			},
 			Rows: []*structpb.ListValue{
 				{Values: []*structpb.Value{
 					{Kind: &structpb.Value_StringValue{StringValue: strconv.Itoa(int(s.ID))}},
-					{Kind: &structpb.Value_StringValue{StringValue: s.FirstName}},
-					{Kind: &structpb.Value_StringValue{StringValue: s.LastName}},
-					{Kind: &structpb.Value_StringValue{StringValue: "2024-02-05T17:17:00Z"}},
 				}},
 			},
 		},

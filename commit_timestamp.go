@@ -27,6 +27,11 @@ import (
 // CommitTimestamp can be used for columns that should write the PENDING_COMMIT_TIMESTAMP().
 // Use it as the type for a field in a model. The corresponding database column must be of
 // type TIMESTAMP, and the option `allow_commit_timestamp=true` must have been set.
+// The Spanner gorm migrator will automatically create a TIMESTAMP column with the
+// `allow_commit_timestamp=true` option enabled for any field that has type CommitTimestamp.
+//
+// Note that the commit timestamp is not returned directly after inserting/updating a row.
+// Instead, the value can only be read after the transaction has been committed.
 //
 // Example:
 //
