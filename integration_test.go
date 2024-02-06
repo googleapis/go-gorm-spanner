@@ -185,3 +185,83 @@ func TestIntegration_Distinct(t *testing.T) {
 		t.Fatalf("Build Distinct with u.*, but got %v", r.Statement.SQL.String())
 	}
 }
+
+func TestIntegration_CommitTimestamp(t *testing.T) {
+	skipIfShort(t)
+	t.Parallel()
+
+	dsn, cleanup, err := testutil.CreateTestDB(context.Background())
+	if err != nil {
+		log.Fatalf("could not init integration tests while creating database: %v", err)
+	}
+	defer cleanup()
+	db, err := gorm.Open(New(Config{
+		DriverName: "spanner",
+		DSN:        dsn,
+	}), &gorm.Config{PrepareStmt: true})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	type Singer struct {
+		gorm.Model
+
+		Name        string
+		LastUpdated CommitTimestamp
+	}
+
+	if err := db.AutoMigrate(&Singer{}); err != nil {
+		t.Fatalf("Failed to migrate with default value, got error: %v", err)
+	}
+	sqlDb, err := db.DB()
+	if err != nil {
+		t.Fatalf("failed to get SQL DB interface: %v", err)
+	}
+	rows, err := sqlDb.Query("select 1 " +
+		"from INFORMATION_SCHEMA.column_options " +
+		"where table_catalog='' " +
+		"and table_schema='' " +
+		"and table_name='singers' " +
+		"and column_name='last_updated' " +
+		"and option_name='allow_commit_timestamp' " +
+		"and option_value='TRUE'")
+	if err != nil {
+		t.Fatalf("failed to query column options: %v", err)
+	}
+	if rows.Next() {
+		var c int64
+		if err := rows.Scan(&c); err != nil {
+			t.Errorf("failed to scan column option value")
+		}
+		if c != int64(1) {
+			t.Errorf("selected option value mismatch")
+		}
+	} else {
+		t.Errorf("failed to get any column options")
+	}
+	if err := rows.Close(); err != nil {
+		t.Errorf("failed to close column option rows")
+	}
+
+	singer := Singer{Name: "Some Singer"}
+	if err := db.Create(&singer).Error; err != nil {
+		t.Fatalf("failed to create singer: %v", err)
+	}
+	// Verify that an ID and a commit timestamp was generated for the singer.
+	// The ID is returned as part of the INSERT statement.
+	// The commit timestamp is only returned after the commit, meaning that we have to re-fetch the singer from the
+	// database before we see it.
+	if singer.ID == 0 {
+		t.Fatalf("no ID returned for singer")
+	}
+	if singer.LastUpdated.Timestamp.Valid {
+		t.Fatalf("unexpected commit timestamp returned for singer")
+	}
+
+	if err := db.Find(&singer, singer.ID).Error; err != nil {
+		t.Fatalf("failed to find singer: %v", err)
+	}
+	if !singer.LastUpdated.Timestamp.Valid {
+		t.Fatalf("missing commit timestamp for singer")
+	}
+}
