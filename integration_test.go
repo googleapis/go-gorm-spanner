@@ -213,6 +213,35 @@ func TestIntegration_CommitTimestamp(t *testing.T) {
 	if err := db.AutoMigrate(&Singer{}); err != nil {
 		t.Fatalf("Failed to migrate with default value, got error: %v", err)
 	}
+	sqlDb, err := db.DB()
+	if err != nil {
+		t.Fatalf("failed to get SQL DB interface: %v", err)
+	}
+	rows, err := sqlDb.Query("select 1 " +
+		"from INFORMATION_SCHEMA.column_options " +
+		"where table_catalog='' " +
+		"and table_schema='' " +
+		"and table_name='singers' " +
+		"and column_name='last_updated' " +
+		"and option_name='allow_commit_timestamp' " +
+		"and option_value='TRUE'")
+	if err != nil {
+		t.Fatalf("failed to query column options: %v", err)
+	}
+	if rows.Next() {
+		var c int64
+		if err := rows.Scan(&c); err != nil {
+			t.Errorf("failed to scan column option value")
+		}
+		if c != int64(1) {
+			t.Errorf("selected option value mismatch")
+		}
+	} else {
+		t.Errorf("failed to get any column options")
+	}
+	if err := rows.Close(); err != nil {
+		t.Errorf("failed to close column option rows")
+	}
 
 	singer := Singer{Name: "Some Singer"}
 	if err := db.Create(&singer).Error; err != nil {
