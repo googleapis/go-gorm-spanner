@@ -10,7 +10,7 @@ require (
 	github.com/googleapis/go-gorm-spanner v0.0.0-20240202151927-cb7163b05a6b
 	github.com/googleapis/go-sql-spanner v1.2.1
 	google.golang.org/genproto v0.0.0-20240125205218-1f4bbc51befe
-	google.golang.org/grpc v1.61.0
+	google.golang.org/grpc v1.62.0
 	gorm.io/datatypes v1.2.0
 	gorm.io/gorm v1.25.5
 )
@@ -24,10 +24,10 @@ require (
 	github.com/census-instrumentation/opencensus-proto v0.4.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/cncf/udpa/go v0.0.0-20220112060539-c52dc94e7fbe // indirect
-	github.com/cncf/xds/go v0.0.0-20231109132714-523115ebc101 // indirect
+	github.com/cncf/xds/go v0.0.0-20231128003011-0fa0005c9caa // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/envoyproxy/go-control-plane v0.11.1 // indirect
-	github.com/envoyproxy/protoc-gen-validate v1.0.2 // indirect
+	github.com/envoyproxy/go-control-plane v0.12.0 // indirect
+	github.com/envoyproxy/protoc-gen-validate v1.0.4 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-logr/logr v1.4.1 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
