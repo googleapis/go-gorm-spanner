@@ -9,7 +9,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/googleapis/go-gorm-spanner v0.0.0-20240202151927-cb7163b05a6b
 	github.com/googleapis/go-sql-spanner v1.2.1
-	google.golang.org/genproto v0.0.0-20240125205218-1f4bbc51befe
+	google.golang.org/genproto v0.0.0-20240221002015-b0ce06bbee7c
 	google.golang.org/grpc v1.62.0
 	gorm.io/datatypes v1.2.0
 	gorm.io/gorm v1.25.5
@@ -17,7 +17,7 @@ require (
 
 require (
 	cloud.google.com/go v0.112.0 // indirect
-	cloud.google.com/go/compute v1.23.3 // indirect
+	cloud.google.com/go/compute v1.24.0 // indirect
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
 	cloud.google.com/go/iam v1.1.6 // indirect
 	cloud.google.com/go/longrunning v0.5.5 // indirect
@@ -61,8 +61,8 @@ require (
 	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028 // indirect
 	google.golang.org/api v0.162.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20240205150955-31a09d347014 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20240205150955-31a09d347014 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20240213162025-012b6fc9bca9 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240213162025-012b6fc9bca9 // indirect
 	google.golang.org/protobuf v1.32.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gorm.io/driver/mysql v1.4.7 // indirect
