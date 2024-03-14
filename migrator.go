@@ -313,6 +313,9 @@ func (m spannerMigrator) ColumnTypes(value interface{}) ([]gorm.ColumnType, erro
 					break
 				}
 			}
+			if column.SQLColumnType == nil {
+				column.SQLColumnType = &sql.ColumnType{}
+			}
 
 			columnTypes = append(columnTypes, column)
 		}
