@@ -7,7 +7,7 @@ require (
 	cloud.google.com/go/spanner v1.57.0
 	github.com/googleapis/go-sql-spanner v1.2.1
 	github.com/shopspring/decimal v1.3.1
-	github.com/stretchr/testify v1.8.4
+	github.com/stretchr/testify v1.9.0
 	google.golang.org/api v0.169.0
 	google.golang.org/grpc v1.62.1
 	google.golang.org/protobuf v1.33.0
