@@ -12,7 +12,7 @@ require (
 	github.com/googleapis/go-gorm-spanner v0.0.0-20240202151927-cb7163b05a6b
 	github.com/googleapis/go-sql-spanner v1.2.1
 	github.com/stretchr/testify v1.8.4
-	gorm.io/gorm v1.25.5
+	gorm.io/gorm v1.25.7
 )
 
 require (
