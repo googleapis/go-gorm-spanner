@@ -76,7 +76,7 @@ func TestIntegration_DefaultValue(t *testing.T) {
 		Name2   string    `gorm:"size:233;not null;default:'foo'"`
 		Name3   string    `gorm:"size:233;notNull;default:''"`
 		Age     int       `gorm:"default:18"`
-		Created time.Time `gorm:"default:2000-01-02"`
+		Created time.Time `gorm:"default:2000-01-02T00:00:00Z"`
 		Enabled bool      `gorm:"default:true"`
 	}
 
@@ -94,7 +94,7 @@ func TestIntegration_DefaultValue(t *testing.T) {
 	var result Harumph
 	if err := db.First(&result, "email = ?", "hello@gorm.io").Error; err != nil {
 		t.Fatalf("Failed to find created data, got error: %v", err)
-	} else if result.Name != "foo" || result.Name2 != "foo" || result.Name3 != "" || result.Age != 18 || !result.Enabled || result.Created.Format("20060102") != "20000102" {
+	} else if result.Name != "foo" || result.Name2 != "foo" || result.Name3 != "" || result.Age != 18 || !result.Enabled || result.Created.UTC().Format("20060102") != "20000102" {
 		t.Fatalf("Failed to find created data with default data, got %+v", result)
 	}
 	require.Conditionf(t, func() (success bool) {
@@ -227,7 +227,8 @@ func TestIntegration_InsertOrUpdate(t *testing.T) {
 	s.LastName = "baz"
 	if err := db.Clauses(clause.OnConflict{UpdateAll: true}).Create(&s).Error; err != nil {
 		// TODO: Remove when the emulator supports insert-or-update.
-		if testutil.RunsOnEmulator() && spanner.ErrCode(err) == codes.AlreadyExists {
+		if testutil.RunsOnEmulator() &&
+			(spanner.ErrCode(err) == codes.AlreadyExists || spanner.ErrCode(err) == codes.Unimplemented) {
 			// This is expected as the emulator does not yet support 'insert or update'.
 			// Simulate it by executing a manual update instead.
 			db.Save(&s)
@@ -254,7 +255,8 @@ func TestIntegration_InsertOrUpdate(t *testing.T) {
 	// Verify that we don't get an error if we try to execute an insert-or-ignore statement.
 	if err := db.Clauses(clause.OnConflict{DoNothing: true}).Create(&s2).Error; err != nil {
 		// TODO: Remove when the emulator supports insert-or-update.
-		if testutil.RunsOnEmulator() && spanner.ErrCode(err) == codes.AlreadyExists {
+		if testutil.RunsOnEmulator() &&
+			(spanner.ErrCode(err) == codes.AlreadyExists || spanner.ErrCode(err) == codes.Unimplemented) {
 			// This is expected as the emulator does not yet support 'insert or update'.
 		} else {
 			t.Fatalf("insort-or-ignore failed: %v", err)
