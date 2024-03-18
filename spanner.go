@@ -87,8 +87,19 @@ func (dialector Dialector) Initialize(db *gorm.DB) (err error) {
 
 	db.ClauseBuilders[clause.Insert{}.Name()] = insertHandler
 	db.ClauseBuilders[clause.Returning{}.Name()] = func(c clause.Clause, builder clause.Builder) {
-		// TODO: check if we can improve this be returning only required columns.
-		_, _ = builder.WriteString("THEN RETURN *")
+		builder.WriteString("THEN RETURN ")
+		returning, ok := c.Expression.(clause.Returning)
+		if ok && len(returning.Columns) > 0 {
+			for idx, column := range returning.Columns {
+				if idx > 0 {
+					builder.WriteByte(',')
+				}
+
+				builder.WriteQuoted(column)
+			}
+		} else {
+			builder.WriteByte('*')
+		}
 	}
 
 	return

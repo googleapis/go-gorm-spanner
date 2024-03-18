@@ -17,20 +17,21 @@ package gorm
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"testing"
-
-	"github.com/golang/protobuf/proto"
-	emptypb "github.com/golang/protobuf/ptypes/empty"
-	"google.golang.org/api/option"
-	"google.golang.org/protobuf/types/known/anypb"
-	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
 
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"cloud.google.com/go/spanner"
 	"cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
-
+	"cloud.google.com/go/spanner/apiv1/spannerpb"
 	"github.com/googleapis/go-sql-spanner/testutil"
+	"google.golang.org/api/option"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/structpb"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 type singer struct {
@@ -125,6 +126,196 @@ func TestMigrate(t *testing.T) {
 			"PRIMARY KEY (`id`)"; g != w {
 		t.Fatalf("create albums statement text mismatch\n Got: %s\nWant: %s", g, w)
 	}
+}
+
+func TestMigrateMultipleTimes(t *testing.T) {
+	t.Parallel()
+
+	db, server, teardown := setupTestGormConnection(t)
+	defer teardown()
+	anyProto, err := anypb.New(&emptypb.Empty{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server.TestDatabaseAdmin.SetResps([]proto.Message{
+		&longrunningpb.Operation{
+			Name:   "test-operation-1",
+			Done:   true,
+			Result: &longrunningpb.Operation_Response{Response: anyProto},
+		},
+		&longrunningpb.Operation{
+			Name:   "test-operation-2",
+			Done:   true,
+			Result: &longrunningpb.Operation_Response{Response: anyProto},
+		},
+	})
+	hasTableSql := "SELECT count(*) FROM information_schema.tables WHERE table_schema = @p1 AND table_name = @p2 AND table_type = @p3"
+	hasColSql := "SELECT count(*) FROM INFORMATION_SCHEMA.columns WHERE table_schema = @p1 AND table_name = @p2 AND column_name = @p3"
+	selectSingerRow := "SELECT * FROM `singers` LIMIT 1"
+	getColDetailsSql := "SELECT COLUMN_NAME, COLUMN_DEFAULT, IS_NULLABLE = 'YES',\n\t\t\t\t\t   REGEXP_REPLACE(SPANNER_TYPE, '\\\\(.*\\\\)', '') AS DATA_TYPE,\n\t\t\t\t\t   SAFE_CAST(REPLACE(REPLACE(REGEXP_EXTRACT(SPANNER_TYPE, '\\\\(.*\\\\)'), '(', ''), ')', '') AS INT64) AS COLUMN_LENGTH,\n\t\t\t\t\t   (SELECT IF(I.INDEX_TYPE='PRIMARY_KEY', 'PRI', 'UNI')\n\t\t\t\t\t\tFROM INFORMATION_SCHEMA.INDEXES I\n\t\t\t\t\t\tINNER JOIN INFORMATION_SCHEMA.INDEX_COLUMNS IC USING (TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME, INDEX_NAME)\n\t\t\t\t\t\tWHERE IC.TABLE_CATALOG=C.TABLE_CATALOG AND IC.TABLE_SCHEMA=IC.TABLE_SCHEMA AND IC.COLUMN_NAME=C.COLUMN_NAME\n\t\t\t\t\t\t  AND I.IS_UNIQUE\n\t\t\t\t\t\tORDER BY I.INDEX_TYPE\n\t\t\t\t\t\tLIMIT 1\n\t\t\t\t\t   ) AS KEY,\n                    FROM INFORMATION_SCHEMA.COLUMNS C WHERE TABLE_SCHEMA = @p1 AND TABLE_NAME = @p2 ORDER BY ORDINAL_POSITION"
+	hasIndexSql := "SELECT count(*) FROM information_schema.indexes WHERE table_schema = @p1 AND table_name = @p2 AND index_name = @p3"
+
+	_ = putCountStatementResult(server, hasTableSql, 0)
+
+	err = db.Migrator().AutoMigrate(&singer{}, &album{}, &test{})
+	// Verify that the first migration worked and executed the expected number of requests.
+	if err != nil {
+		t.Fatal(err)
+	}
+	requests := server.TestDatabaseAdmin.Reqs()
+	if g, w := len(requests), 1; g != w {
+		t.Fatalf("request count mismatch\n Got: %v\nWant: %v", g, w)
+	}
+	request := requests[0].(*databasepb.UpdateDatabaseDdlRequest)
+	if g, w := len(request.GetStatements()), 8; g != w {
+		t.Fatalf("statement count mismatch\n Got: %v\nWant: %v", g, w)
+	}
+
+	// Then auto-migrate again with an unchanged data model.
+	// This should lead to zero changes.
+	_ = putCountStatementResult(server, hasTableSql, 1)
+	_ = putCountStatementResult(server, hasColSql, 1)
+	_ = putSelectSingerRowResult(server, selectSingerRow)
+	_ = putSingerColDetailsResult(server, getColDetailsSql)
+	_ = putCountStatementResult(server, hasIndexSql, 1)
+
+	err = db.Migrator().AutoMigrate(&singer{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// The number of requests should still be 1, as we have made no changes to the `singer` table and model.
+	requests = server.TestDatabaseAdmin.Reqs()
+	if g, w := len(requests), 1; g != w {
+		t.Fatalf("request count mismatch\n Got: %v\nWant: %v", g, w)
+	}
+}
+
+func putCountStatementResult(server *testutil.MockedSpannerInMemTestServer, sql string, count int) error {
+	return server.TestSpanner.PutStatementResult(sql, &testutil.StatementResult{
+		Type: testutil.StatementResultResultSet,
+		ResultSet: &spannerpb.ResultSet{
+			Metadata: &spannerpb.ResultSetMetadata{
+				RowType: &spannerpb.StructType{
+					Fields: []*spannerpb.StructType_Field{
+						{Type: &spannerpb.Type{Code: spannerpb.TypeCode_INT64}, Name: "count"},
+					},
+				},
+			},
+			Rows: []*structpb.ListValue{
+				{Values: []*structpb.Value{{Kind: &structpb.Value_StringValue{StringValue: strconv.Itoa(count)}}}},
+			},
+		},
+	})
+}
+
+func putSingerColDetailsResult(server *testutil.MockedSpannerInMemTestServer, sql string) error {
+	return server.TestSpanner.PutStatementResult(sql, &testutil.StatementResult{
+		Type: testutil.StatementResultResultSet,
+		ResultSet: &spannerpb.ResultSet{
+			Metadata: &spannerpb.ResultSetMetadata{
+				RowType: &spannerpb.StructType{
+					Fields: []*spannerpb.StructType_Field{
+						{Type: &spannerpb.Type{Code: spannerpb.TypeCode_STRING}, Name: "COLUMN_NAME"},
+						{Type: &spannerpb.Type{Code: spannerpb.TypeCode_STRING}, Name: "COLUMN_DEFAULT"},
+						{Type: &spannerpb.Type{Code: spannerpb.TypeCode_BOOL}, Name: "IS_NULLABLE"},
+						{Type: &spannerpb.Type{Code: spannerpb.TypeCode_STRING}, Name: "DATA_TYPE"},
+						{Type: &spannerpb.Type{Code: spannerpb.TypeCode_INT64}, Name: "COLUMN_LENGTH"},
+						{Type: &spannerpb.Type{Code: spannerpb.TypeCode_STRING}, Name: "KEY"},
+					},
+				},
+			},
+			Rows: []*structpb.ListValue{
+				{Values: []*structpb.Value{
+					{Kind: &structpb.Value_StringValue{StringValue: "id"}},
+					{Kind: &structpb.Value_StringValue{StringValue: "GET_NEXT_SEQUENCE_VALUE(Sequence singers_seq)"}},
+					{Kind: &structpb.Value_BoolValue{BoolValue: true}},
+					{Kind: &structpb.Value_StringValue{StringValue: "INT64"}},
+					{Kind: &structpb.Value_NullValue{}},
+					{Kind: &structpb.Value_NullValue{}},
+				}},
+				{Values: []*structpb.Value{
+					{Kind: &structpb.Value_StringValue{StringValue: "created_at"}},
+					{Kind: &structpb.Value_NullValue{}},
+					{Kind: &structpb.Value_BoolValue{BoolValue: true}},
+					{Kind: &structpb.Value_StringValue{StringValue: "TIMESTAMP"}},
+					{Kind: &structpb.Value_NullValue{}},
+					{Kind: &structpb.Value_NullValue{}},
+				}},
+				{Values: []*structpb.Value{
+					{Kind: &structpb.Value_StringValue{StringValue: "updated_at"}},
+					{Kind: &structpb.Value_NullValue{}},
+					{Kind: &structpb.Value_BoolValue{BoolValue: true}},
+					{Kind: &structpb.Value_StringValue{StringValue: "TIMESTAMP"}},
+					{Kind: &structpb.Value_NullValue{}},
+					{Kind: &structpb.Value_NullValue{}},
+				}},
+				{Values: []*structpb.Value{
+					{Kind: &structpb.Value_StringValue{StringValue: "deleted_at"}},
+					{Kind: &structpb.Value_NullValue{}},
+					{Kind: &structpb.Value_BoolValue{BoolValue: true}},
+					{Kind: &structpb.Value_StringValue{StringValue: "TIMESTAMP"}},
+					{Kind: &structpb.Value_NullValue{}},
+					{Kind: &structpb.Value_NullValue{}},
+				}},
+				{Values: []*structpb.Value{
+					{Kind: &structpb.Value_StringValue{StringValue: "first_name"}},
+					{Kind: &structpb.Value_NullValue{}},
+					{Kind: &structpb.Value_BoolValue{BoolValue: true}},
+					{Kind: &structpb.Value_StringValue{StringValue: "STRING"}},
+					{Kind: &structpb.Value_NullValue{}},
+					{Kind: &structpb.Value_NullValue{}},
+				}},
+				{Values: []*structpb.Value{
+					{Kind: &structpb.Value_StringValue{StringValue: "last_name"}},
+					{Kind: &structpb.Value_NullValue{}},
+					{Kind: &structpb.Value_BoolValue{BoolValue: true}},
+					{Kind: &structpb.Value_StringValue{StringValue: "STRING"}},
+					{Kind: &structpb.Value_NullValue{}},
+					{Kind: &structpb.Value_NullValue{}},
+				}},
+				{Values: []*structpb.Value{
+					{Kind: &structpb.Value_StringValue{StringValue: "full_name"}},
+					{Kind: &structpb.Value_NullValue{}},
+					{Kind: &structpb.Value_BoolValue{BoolValue: true}},
+					{Kind: &structpb.Value_StringValue{StringValue: "STRING"}},
+					{Kind: &structpb.Value_NullValue{}},
+					{Kind: &structpb.Value_NullValue{}},
+				}},
+				{Values: []*structpb.Value{
+					{Kind: &structpb.Value_StringValue{StringValue: "active"}},
+					{Kind: &structpb.Value_NullValue{}},
+					{Kind: &structpb.Value_BoolValue{BoolValue: true}},
+					{Kind: &structpb.Value_StringValue{StringValue: "BOOL"}},
+					{Kind: &structpb.Value_NullValue{}},
+					{Kind: &structpb.Value_NullValue{}},
+				}},
+			},
+		},
+	})
+}
+
+func putSelectSingerRowResult(server *testutil.MockedSpannerInMemTestServer, sql string) error {
+	return server.TestSpanner.PutStatementResult(sql, &testutil.StatementResult{
+		Type: testutil.StatementResultResultSet,
+		ResultSet: &spannerpb.ResultSet{
+			Metadata: &spannerpb.ResultSetMetadata{
+				RowType: &spannerpb.StructType{
+					Fields: []*spannerpb.StructType_Field{
+						{Type: &spannerpb.Type{Code: spannerpb.TypeCode_INT64}, Name: "id"},
+						{Type: &spannerpb.Type{Code: spannerpb.TypeCode_TIMESTAMP}, Name: "created_at"},
+						{Type: &spannerpb.Type{Code: spannerpb.TypeCode_TIMESTAMP}, Name: "updated_at"},
+						{Type: &spannerpb.Type{Code: spannerpb.TypeCode_TIMESTAMP}, Name: "deleted_at"},
+						{Type: &spannerpb.Type{Code: spannerpb.TypeCode_STRING}, Name: "first_name"},
+						{Type: &spannerpb.Type{Code: spannerpb.TypeCode_STRING}, Name: "last_name"},
+						{Type: &spannerpb.Type{Code: spannerpb.TypeCode_STRING}, Name: "full_name"},
+						{Type: &spannerpb.Type{Code: spannerpb.TypeCode_BOOL}, Name: "active"},
+					},
+				},
+			},
+			Rows: []*structpb.ListValue{},
+		},
+	})
 }
 
 func setupTestGormConnection(t *testing.T) (db *gorm.DB, server *testutil.MockedSpannerInMemTestServer, teardown func()) {
