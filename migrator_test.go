@@ -44,6 +44,7 @@ type singer struct {
 type album struct {
 	gorm.Model
 	Title    string
+	Rating   float32
 	SingerID uint
 	Singer   *singer
 }
@@ -105,7 +106,7 @@ func TestMigrate(t *testing.T) {
 	}
 	if g, w := request.GetStatements()[4],
 		"CREATE TABLE `albums` (`id` INT64 DEFAULT (GET_NEXT_SEQUENCE_VALUE(Sequence albums_seq)),`created_at` TIMESTAMP,`updated_at` TIMESTAMP,`deleted_at` TIMESTAMP,"+
-			"`title` STRING(MAX),`singer_id` INT64,"+
+			"`title` STRING(MAX),`rating` FLOAT32,`singer_id` INT64,"+
 			"CONSTRAINT `fk_albums_singer` FOREIGN KEY (`singer_id`) REFERENCES `singers`(`id`)) "+
 			"PRIMARY KEY (`id`)"; g != w {
 		t.Fatalf("create albums statement text mismatch\n Got: %s\nWant: %s", g, w)
