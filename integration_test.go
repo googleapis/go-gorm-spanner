@@ -24,12 +24,11 @@ import (
 	"time"
 
 	"cloud.google.com/go/spanner"
+	"github.com/googleapis/go-gorm-spanner/testutil"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
-
-	"github.com/googleapis/go-gorm-spanner/testutil"
 )
 
 func TestMain(m *testing.M) {
