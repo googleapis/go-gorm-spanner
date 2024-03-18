@@ -77,17 +77,18 @@ releases. They are currently compatible with:
 ## Data Types
 Cloud Spanner supports the following data types in combination with `gorm`.
 
-| Cloud Spanner Type       | gorm / go type             |
-|--------------------------|----------------------------|
-| bool                     | bool, sql.NullBool         |
-| int64                    | uint, int64, sql.NullInt64 |
-| string                   | string, sql.NullString     |
-| json                     | string, sql.NullString     |
-| float64                  | float64, sql.NullFloat64   |
-| numeric                  | decimal.NullDecimal        |
-| timestamp with time zone | time.Time, sql.NullTime    |
-| date                     | datatypes.Date             |
-| bytes                    | []byte                     |
+| Cloud Spanner Type       | gorm / go type               |
+|--------------------------|------------------------------|
+| bool                     | bool, sql.NullBool           |
+| int64                    | uint, int64, sql.NullInt64   |
+| string                   | string, sql.NullString       |
+| json                     | string, sql.NullString       |
+| float64                  | float64, sql.NullFloat64     |
+| float32                  | float32, spanner.NullFloat32 |
+| numeric                  | decimal.NullDecimal          |
+| timestamp with time zone | time.Time, sql.NullTime      |
+| date                     | datatypes.Date               |
+| bytes                    | []byte                       |
 
 
 ## Limitations

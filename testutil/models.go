@@ -16,8 +16,9 @@ package testutil
 
 import (
 	"database/sql"
-	"gorm.io/gorm"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 // User has one `Account` (has one), many `Pets` (has many) and `Toys` (has many - polymorphic)
@@ -78,7 +79,7 @@ type Coupon struct {
 	ID               int              `gorm:"primarykey"`
 	AppliesToProduct []*CouponProduct `gorm:"foreignKey:CouponId;constraint:OnDelete:CASCADE"`
 	AmountOff        int64            `gorm:"column:amount_off"`
-	PercentOff       float32          `gorm:"column:percent_off"`
+	PercentOff       float64          `gorm:"column:percent_off"`
 }
 
 type CouponProduct struct {
