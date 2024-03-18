@@ -23,10 +23,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
-	"gorm.io/gorm"
-
+	"cloud.google.com/go/spanner"
 	"github.com/googleapis/go-gorm-spanner/testutil"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 func TestMain(m *testing.M) {
@@ -73,7 +75,7 @@ func TestIntegration_DefaultValue(t *testing.T) {
 		Name2   string    `gorm:"size:233;not null;default:'foo'"`
 		Name3   string    `gorm:"size:233;notNull;default:''"`
 		Age     int       `gorm:"default:18"`
-		Created time.Time `gorm:"default:2000-01-02"`
+		Created time.Time `gorm:"default:2000-01-02T00:00:00Z"`
 		Enabled bool      `gorm:"default:true"`
 	}
 
@@ -91,7 +93,7 @@ func TestIntegration_DefaultValue(t *testing.T) {
 	var result Harumph
 	if err := db.First(&result, "email = ?", "hello@gorm.io").Error; err != nil {
 		t.Fatalf("Failed to find created data, got error: %v", err)
-	} else if result.Name != "foo" || result.Name2 != "foo" || result.Name3 != "" || result.Age != 18 || !result.Enabled || result.Created.Format("20060102") != "20000102" {
+	} else if result.Name != "foo" || result.Name2 != "foo" || result.Name3 != "" || result.Age != 18 || !result.Enabled || result.Created.UTC().Format("20060102") != "20000102" {
 		t.Fatalf("Failed to find created data with default data, got %+v", result)
 	}
 	require.Conditionf(t, func() (success bool) {
@@ -183,6 +185,81 @@ func TestIntegration_Distinct(t *testing.T) {
 	r := dryDB.Distinct("u.id, u.*").Table("user_speaks as s").Joins("inner join users as u on u.id = s.user_id").Where("s.language_code ='US' or s.language_code ='ES'").Find(&testutil.User{})
 	if !regexp.MustCompile(`SELECT DISTINCT u\.id, u\.\* FROM user_speaks as s inner join users as u`).MatchString(r.Statement.SQL.String()) {
 		t.Fatalf("Build Distinct with u.*, but got %v", r.Statement.SQL.String())
+	}
+}
+
+func TestIntegration_InsertOrUpdate(t *testing.T) {
+	skipIfShort(t)
+
+	t.Parallel()
+	dsn, cleanup, err := testutil.CreateTestDB(context.Background())
+	if err != nil {
+		log.Fatalf("could not init integration tests while creating database: %v", err)
+	}
+	defer cleanup()
+	// Open db.
+	db, err := gorm.Open(New(Config{
+		DriverName: "spanner",
+		DSN:        dsn,
+	}), &gorm.Config{PrepareStmt: true})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	type singer struct {
+		gorm.Model
+		FirstName string
+		LastName  string
+	}
+
+	if err := db.AutoMigrate(&singer{}); err != nil {
+		t.Fatalf("Failed to migrate: %v", err)
+	}
+
+	// Insert a singer record.
+	s := singer{FirstName: "foo", LastName: "bar"}
+	if err := db.Create(&s).Error; err != nil {
+		t.Fatalf("failed to insert new singer: %v", err)
+	}
+
+	// Update the singer model and do an insert-or-update.
+	s.LastName = "baz"
+	if err := db.Clauses(clause.OnConflict{UpdateAll: true}).Create(&s).Error; err != nil {
+		// TODO: Remove when the emulator supports insert-or-update.
+		if testutil.RunsOnEmulator() &&
+			(spanner.ErrCode(err) == codes.AlreadyExists || spanner.ErrCode(err) == codes.Unimplemented) {
+			// This is expected as the emulator does not yet support 'insert or update'.
+			// Simulate it by executing a manual update instead.
+			db.Save(&s)
+		} else {
+			t.Fatalf("failed to update singer: %v", err)
+		}
+	}
+	// Verify the value in the database.
+	var s2 singer
+	db.First(&s2)
+	if g, w := s2.LastName, "baz"; g != w {
+		t.Errorf("LastName mismatch\n Got: %v\nWant: %v", g, w)
+	}
+
+	// Verify that we get an AlreadyExists error if we try to execute a normal insert.
+	if err := db.Create(&s2).Error; err == nil {
+		t.Errorf("missing expected error for insert")
+	} else {
+		if g, w := spanner.ErrCode(err), codes.AlreadyExists; g != w {
+			t.Errorf("error code mismatch\n Got: %v\nWant: %v", g, w)
+		}
+	}
+
+	// Verify that we don't get an error if we try to execute an insert-or-ignore statement.
+	if err := db.Clauses(clause.OnConflict{DoNothing: true}).Create(&s2).Error; err != nil {
+		// TODO: Remove when the emulator supports insert-or-update.
+		if testutil.RunsOnEmulator() &&
+			(spanner.ErrCode(err) == codes.AlreadyExists || spanner.ErrCode(err) == codes.Unimplemented) {
+			// This is expected as the emulator does not yet support 'insert or update'.
+		} else {
+			t.Fatalf("insort-or-ignore failed: %v", err)
+		}
 	}
 }
 
