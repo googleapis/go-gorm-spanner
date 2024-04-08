@@ -7,7 +7,7 @@ replace github.com/googleapis/go-gorm-spanner => ../
 require (
 	cloud.google.com/go/spanner v1.60.0
 	github.com/google/uuid v1.6.0
-	github.com/googleapis/go-gorm-spanner v0.0.0-20240202151927-cb7163b05a6b
+	github.com/googleapis/go-gorm-spanner v1.2.0
 	github.com/googleapis/go-sql-spanner v1.3.0
 	google.golang.org/genproto v0.0.0-20240318140521-94a12d6c2237
 	google.golang.org/grpc v1.62.1
