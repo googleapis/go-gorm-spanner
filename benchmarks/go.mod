@@ -10,7 +10,7 @@ require (
 	github.com/googleapis/go-gorm-spanner v0.0.0-20240202151927-cb7163b05a6b
 	github.com/googleapis/go-sql-spanner v1.3.0
 	google.golang.org/genproto v0.0.0-20240318140521-94a12d6c2237
-	google.golang.org/grpc v1.62.1
+	google.golang.org/grpc v1.63.0
 	gorm.io/datatypes v1.2.0
 	gorm.io/gorm v1.25.8
 )
