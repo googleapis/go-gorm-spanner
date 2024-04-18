@@ -220,6 +220,52 @@ func (m spannerMigrator) HasIndex(value interface{}, name string) bool {
 	return count > 0
 }
 
+func (m spannerMigrator) GetIndexes() value interface{}) ([]gorm.Index, error) {
+	const indexSQL = `
+	SELECT 
+		i.index_name,
+		i.is_unique,
+		i.index_type,
+		col.column_name,
+	FROM
+		information_schema.indexes i
+		LEFT JOIN information_schema.index_columns ic ON ic.table_name = i.table_name AND ic.index_name = i.index_name
+		LEFT JOIN information_schema.columns col ON col.column_name = ic.column_name AND col.table_name = ic.table_name
+	WHERE 
+		i.index_name IS NOT NULL
+		AND i.table_schema = ?
+		AND i.table_name = ?
+	`
+	indexes := make([]gorm.Index, 0)
+	err := m.RunWithValue(value, func(stmt *gorm.Statement) error {
+		currentDatabase := m.DB.Migrator().CurrentDatabase()
+		result := make([]*Index, 0)
+		if err := m.DB.Raw(indexSQL, currentDatabase, stmt.Table).Scan(&result).Error; err != nil {
+			return err
+		}
+		indexMap := make(map[string]*migrator.Index)
+		for _, r := range result {
+			idx, ok := indexMap[r.IndexName]
+			if !ok {
+				idx = &migrator.Index{
+					TableName:       stmt.Table,
+					NameValue:       r.IndexName,
+					ColumnList:      nil,
+					PrimaryKeyValue: r.IsPrimaryKey,
+					UniqueValue:     r.IsUnique,
+				}
+			}
+			idx.ColumnList = append(idx.ColumnList, r.ColumnName)
+			indexMap[r.IndexName] = idx
+		}
+		for _, idx := range indexMap {
+			indexes = append(indexes, idx)
+		}
+		return nil
+	})
+	return indexes, err
+}
+
 func (m spannerMigrator) DropIndex(value interface{}, name string) error {
 	return m.RunWithValue(value, func(stmt *gorm.Statement) error {
 		if idx := stmt.Schema.LookIndex(name); idx != nil {
