@@ -47,6 +47,14 @@ type spannerColumnType struct {
 	GenerationExpression sql.NullString
 }
 
+type Index struct {
+	TableName    string
+	ColumnName   string
+	IndexName    string
+	IsUnique     sql.NullBool
+	IsPrimaryKey sql.NullBool
+}
+
 func (m spannerMigrator) CurrentDatabase() (name string) {
 	return ""
 }
@@ -226,7 +234,7 @@ func (m spannerMigrator) GetIndexes() value interface{}) ([]gorm.Index, error) {
 		i.index_name,
 		i.is_unique,
 		i.index_type,
-		col.column_name,
+		col.column_name
 	FROM
 		information_schema.indexes i
 		LEFT JOIN information_schema.index_columns ic ON ic.table_name = i.table_name AND ic.index_name = i.index_name
