@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.2.1](https://github.com/googleapis/go-gorm-spanner/compare/v1.2.0...v1.2.1) (2024-04-20)
+
+
+### Bug Fixes
+
+* **deps:** Update google.golang.org/genproto digest to 8c6c420 ([#67](https://github.com/googleapis/go-gorm-spanner/issues/67)) ([367ab93](https://github.com/googleapis/go-gorm-spanner/commit/367ab9390310a662ed975c73fcbc1b73a5ccdb80))
+* **deps:** Update google.golang.org/genproto digest to c3f9821 ([#59](https://github.com/googleapis/go-gorm-spanner/issues/59)) ([682f128](https://github.com/googleapis/go-gorm-spanner/commit/682f128db2063ff0176b5e9620c2e2cd3c43dca6))
+* **deps:** Update module cloud.google.com/go to v0.112.2 ([#60](https://github.com/googleapis/go-gorm-spanner/issues/60)) ([04944ab](https://github.com/googleapis/go-gorm-spanner/commit/04944ab35bc860ead24d697551dac2f143e62917))
+* **deps:** Update module github.com/docker/docker to v26 ([#64](https://github.com/googleapis/go-gorm-spanner/issues/64)) ([7edc78a](https://github.com/googleapis/go-gorm-spanner/commit/7edc78a3b3de8698fa871b625a400ad3f36ccff3))
+* **deps:** Update module github.com/googleapis/go-gorm-spanner to v1 ([#65](https://github.com/googleapis/go-gorm-spanner/issues/65)) ([e024a54](https://github.com/googleapis/go-gorm-spanner/commit/e024a54e2439b764a4ccd927aa4e8b4b6b2ba132))
+* **deps:** Update module google.golang.org/api to v0.172.0 ([#62](https://github.com/googleapis/go-gorm-spanner/issues/62)) ([e005a71](https://github.com/googleapis/go-gorm-spanner/commit/e005a71ee7db99d146ccee31ef960fd7512abf19))
+* **deps:** Update module google.golang.org/grpc to v1.63.0 ([#63](https://github.com/googleapis/go-gorm-spanner/issues/63)) ([79fec61](https://github.com/googleapis/go-gorm-spanner/commit/79fec61955d18226a9387e22f72a83670c2f9534))
+* **deps:** Update module gorm.io/gorm to v1.25.9 ([#61](https://github.com/googleapis/go-gorm-spanner/issues/61)) ([4606bf1](https://github.com/googleapis/go-gorm-spanner/commit/4606bf180729fb88b388f9ce0e08f2c3943b9ee7))
+
 ## [1.2.0](https://github.com/googleapis/go-gorm-spanner/compare/v1.1.0...v1.2.0) (2024-03-25)
 
 
