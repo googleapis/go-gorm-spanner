@@ -228,7 +228,7 @@ func (m spannerMigrator) HasIndex(value interface{}, name string) bool {
 	return count > 0
 }
 
-func (m spannerMigrator) GetIndexes() value interface{}) ([]gorm.Index, error) {
+func (m spannerMigrator) GetIndexes(value interface{}) ([]gorm.Index, error) {
 	const indexSQL = `
 	SELECT 
 		i.index_name,
