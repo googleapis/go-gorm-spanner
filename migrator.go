@@ -211,6 +211,44 @@ func (m spannerMigrator) DropTable(values ...interface{}) error {
 	return nil
 }
 
+// CreateIndex creates an index under specified table with the specified name
+func (m spannerMigrator) CreateIndex(value interface{}, name string) error {
+	return m.RunWithValue(value, func(stmt *gorm.Statement) error {
+		if stmt.Schema != nil {
+			if idx := stmt.Schema.LookIndex(name); idx != nil {
+				opts := m.BuildIndexOptions(idx.Fields, stmt)
+				values := []interface{}{clause.Column{Name: idx.Name}, m.CurrentTable(stmt), opts}
+
+				createIndexSQL := "CREATE "
+				if idx.Class != "" {
+					createIndexSQL += idx.Class + " "
+				}
+				createIndexSQL += "INDEX "
+
+				if strings.TrimSpace(strings.ToUpper(idx.Option)) == "CONCURRENTLY" {
+					createIndexSQL += "CONCURRENTLY "
+				}
+
+				createIndexSQL += "IF NOT EXISTS ? ON ?"
+
+				if idx.Type != "" {
+					createIndexSQL += " USING " + idx.Type + "(?)"
+				} else {
+					createIndexSQL += " ?"
+				}
+
+				if idx.Where != "" {
+					createIndexSQL += " WHERE " + idx.Where
+				}
+
+				return m.DB.Exec(createIndexSQL, values...).Error
+			}
+		}
+
+		return fmt.Errorf("failed to create index with name %v", name)
+	})
+}
+
 func (m spannerMigrator) HasIndex(value interface{}, name string) bool {
 	var count int64
 	m.RunWithValue(value, func(stmt *gorm.Statement) error {
