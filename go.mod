@@ -6,7 +6,7 @@ require (
 	cloud.google.com/go/longrunning v0.5.6
 	cloud.google.com/go/spanner v1.60.0
 	github.com/googleapis/go-sql-spanner v1.3.1
-	github.com/shopspring/decimal v1.3.1
+	github.com/shopspring/decimal v1.4.0
 	github.com/stretchr/testify v1.9.0
 	google.golang.org/api v0.174.0
 	google.golang.org/grpc v1.63.2
