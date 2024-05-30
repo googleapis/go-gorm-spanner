@@ -24,19 +24,12 @@ import (
 	samples "github.com/googleapis/go-gorm-spanner/samples/interleave"
 )
 
-type VenueDetails struct {
-	Name   spanner.NullString   `json:"name"`
-	Rating spanner.NullFloat64  `json:"rating"`
-	Open   interface{}          `json:"open"`
-	Tags   []spanner.NullString `json:"tags"`
-}
-
 func UpdateDataWithJsonColumn(w io.Writer, db *gorm.DB) error {
 	if err := db.Save(&samples.Venue{
 		Model:       gorm.Model{ID: 4, CreatedAt: time.Now()},
 		Name:        "Venue 1",
 		Description: "Venue 1 description",
-		VenueDetails: spanner.NullJSON{Value: []VenueDetails{
+		VenueDetails: spanner.NullJSON{Value: []samples.VenueDetails{
 			{Name: spanner.NullString{StringVal: "room1", Valid: true}, Open: true},
 			{Name: spanner.NullString{StringVal: "room2", Valid: true}, Open: false},
 		}, Valid: true},
@@ -47,7 +40,7 @@ func UpdateDataWithJsonColumn(w io.Writer, db *gorm.DB) error {
 		Model:       gorm.Model{ID: 19, CreatedAt: time.Now()},
 		Name:        "Venue 2",
 		Description: "Venue 2 description",
-		VenueDetails: spanner.NullJSON{Value: VenueDetails{
+		VenueDetails: spanner.NullJSON{Value: samples.VenueDetails{
 			Rating: spanner.NullFloat64{Float64: 9, Valid: true},
 			Open:   true,
 		}, Valid: true},
@@ -58,7 +51,7 @@ func UpdateDataWithJsonColumn(w io.Writer, db *gorm.DB) error {
 		Model:       gorm.Model{ID: 42, CreatedAt: time.Now()},
 		Name:        "Venue 3",
 		Description: "Venue 3 description",
-		VenueDetails: spanner.NullJSON{Value: VenueDetails{
+		VenueDetails: spanner.NullJSON{Value: samples.VenueDetails{
 			Name: spanner.NullString{Valid: false},
 			Open: map[string]bool{"monday": true, "tuesday": false},
 			Tags: []spanner.NullString{{StringVal: "large", Valid: true}, {StringVal: "airy", Valid: true}},
@@ -73,7 +66,7 @@ func UpdateDataWithJsonColumn(w io.Writer, db *gorm.DB) error {
 func QueryWithJsonParameter(w io.Writer, db *gorm.DB) error {
 	var venues []samples.Venue
 	if err := db.Find(&venues, "JSON_VALUE(venue_details, '$.rating') = JSON_VALUE(@details, '$.rating')", map[string]interface{}{
-		"details": spanner.NullJSON{Value: VenueDetails{
+		"details": spanner.NullJSON{Value: samples.VenueDetails{
 			Rating: spanner.NullFloat64{Float64: 9, Valid: true},
 		}, Valid: true},
 	}).Error; err != nil {

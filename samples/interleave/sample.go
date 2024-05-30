@@ -74,6 +74,13 @@ type Venue struct {
 	VenueDetails spanner.NullJSON
 }
 
+type VenueDetails struct {
+	Name   spanner.NullString   `json:"name"`
+	Rating spanner.NullFloat64  `json:"rating"`
+	Open   interface{}          `json:"open"`
+	Tags   []spanner.NullString `json:"tags"`
+}
+
 type Concert struct {
 	gorm.Model
 	Name      string
