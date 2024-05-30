@@ -82,7 +82,7 @@ Cloud Spanner supports the following data types in combination with `gorm`.
 | bool                     | bool, sql.NullBool           |
 | int64                    | uint, int64, sql.NullInt64   |
 | string                   | string, sql.NullString       |
-| json                     | string, sql.NullString       |
+| json                     | spanner.NullJSON             |
 | float64                  | float64, sql.NullFloat64     |
 | float32                  | float32, spanner.NullFloat32 |
 | numeric                  | decimal.NullDecimal          |

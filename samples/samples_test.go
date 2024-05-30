@@ -28,6 +28,7 @@ import (
 	"gorm.io/gorm/logger"
 
 	spannergorm "github.com/googleapis/go-gorm-spanner"
+	jsonsamples "github.com/googleapis/go-gorm-spanner/samples"
 	"github.com/googleapis/go-gorm-spanner/samples/interleave"
 	"github.com/googleapis/go-gorm-spanner/testutil"
 )
@@ -63,6 +64,11 @@ func TestIntegration_Sample(t *testing.T) {
 	assertContains(t, out, "Fetched all concerts")
 	out = runSample(t, samples.PrintAlbumsReleaseBefore1900, db, "failed to fetch albums released before 1900")
 	assertContains(t, out, "was released at")
+
+	out = runSample(t, jsonsamples.UpdateDataWithJsonColumn, db, "failed to update data with json")
+	assertContains(t, out, "Updated data to VenueDetails column\n")
+	out = runSample(t, jsonsamples.QueryWithJsonParameter, db, "failed to query with json parameter")
+	assertContains(t, out, "The venue details for venue id 19")
 }
 
 func runSample(t *testing.T, f sampleFunc, db *gorm.DB, errMsg string) string {
