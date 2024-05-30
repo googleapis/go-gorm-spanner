@@ -112,7 +112,7 @@ func initTestInstance(config string) (cleanup func(), err error) {
 		// Also delete any other stale test instance.
 		instances := instanceAdmin.ListInstances(ctx, &instancepb.ListInstancesRequest{
 			Parent: fmt.Sprintf("projects/%s", projectId),
-			Filter: "label.gormtestinstance:*",
+			Filter: "labels.gormtestinstance:true",
 		})
 		for {
 			instance, err := instances.Next()
