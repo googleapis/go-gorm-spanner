@@ -69,8 +69,9 @@ type Track struct {
 
 type Venue struct {
 	gorm.Model
-	Name        string
-	Description string
+	Name         string
+	Description  string
+	VenueDetails spanner.NullJSON
 }
 
 type Concert struct {
