@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	cloud.google.com/go/longrunning v0.5.7
-	cloud.google.com/go/spanner v1.60.0
+	cloud.google.com/go/spanner v1.63.0
 	github.com/googleapis/go-sql-spanner v1.3.1
 	github.com/shopspring/decimal v1.4.0
 	github.com/stretchr/testify v1.9.0
@@ -20,7 +20,8 @@ require (
 	cloud.google.com/go/auth v0.4.2 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.2 // indirect
 	cloud.google.com/go/compute/metadata v0.3.0 // indirect
-	cloud.google.com/go/iam v1.1.7 // indirect
+	cloud.google.com/go/iam v1.1.8 // indirect
+	github.com/GoogleCloudPlatform/grpc-gcp-go/grpcgcp v1.5.0 // indirect
 	github.com/census-instrumentation/opencensus-proto v0.4.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/cncf/xds/go v0.0.0-20240318125728-8a4994d93e50 // indirect
