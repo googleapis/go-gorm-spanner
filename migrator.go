@@ -47,6 +47,14 @@ type spannerColumnType struct {
 	GenerationExpression sql.NullString
 }
 
+type Index struct {
+	TableName    string
+	ColumnName   string
+	IndexName    string
+	IsUnique     sql.NullBool
+	IsPrimaryKey sql.NullBool
+}
+
 func (m spannerMigrator) CurrentDatabase() (name string) {
 	return ""
 }
@@ -203,6 +211,44 @@ func (m spannerMigrator) DropTable(values ...interface{}) error {
 	return nil
 }
 
+// CreateIndex creates an index under specified table with the specified name
+func (m spannerMigrator) CreateIndex(value interface{}, name string) error {
+	return m.RunWithValue(value, func(stmt *gorm.Statement) error {
+		if stmt.Schema != nil {
+			if idx := stmt.Schema.LookIndex(name); idx != nil {
+				opts := m.BuildIndexOptions(idx.Fields, stmt)
+				values := []interface{}{clause.Column{Name: idx.Name}, m.CurrentTable(stmt), opts}
+
+				createIndexSQL := "CREATE "
+				if idx.Class != "" {
+					createIndexSQL += idx.Class + " "
+				}
+				createIndexSQL += "INDEX "
+
+				if strings.TrimSpace(strings.ToUpper(idx.Option)) == "CONCURRENTLY" {
+					createIndexSQL += "CONCURRENTLY "
+				}
+
+				createIndexSQL += "IF NOT EXISTS ? ON ?"
+
+				if idx.Type != "" {
+					createIndexSQL += " USING " + idx.Type + "(?)"
+				} else {
+					createIndexSQL += " ?"
+				}
+
+				if idx.Where != "" {
+					createIndexSQL += " WHERE " + idx.Where
+				}
+
+				return m.DB.Exec(createIndexSQL, values...).Error
+			}
+		}
+
+		return fmt.Errorf("failed to create index with name %v", name)
+	})
+}
+
 func (m spannerMigrator) HasIndex(value interface{}, name string) bool {
 	var count int64
 	m.RunWithValue(value, func(stmt *gorm.Statement) error {
@@ -218,6 +264,52 @@ func (m spannerMigrator) HasIndex(value interface{}, name string) bool {
 	})
 
 	return count > 0
+}
+
+func (m spannerMigrator) GetIndexes(value interface{}) ([]gorm.Index, error) {
+	const indexSQL = `
+	SELECT 
+		i.index_name,
+		i.is_unique,
+		i.index_type,
+		col.column_name
+	FROM
+		information_schema.indexes i
+		LEFT JOIN information_schema.index_columns ic ON ic.table_name = i.table_name AND ic.index_name = i.index_name
+		LEFT JOIN information_schema.columns col ON col.column_name = ic.column_name AND col.table_name = ic.table_name
+	WHERE 
+		i.index_name IS NOT NULL
+		AND i.table_schema = ?
+		AND i.table_name = ?
+	`
+	indexes := make([]gorm.Index, 0)
+	err := m.RunWithValue(value, func(stmt *gorm.Statement) error {
+		currentDatabase := m.DB.Migrator().CurrentDatabase()
+		result := make([]*Index, 0)
+		if err := m.DB.Raw(indexSQL, currentDatabase, stmt.Table).Scan(&result).Error; err != nil {
+			return err
+		}
+		indexMap := make(map[string]*migrator.Index)
+		for _, r := range result {
+			idx, ok := indexMap[r.IndexName]
+			if !ok {
+				idx = &migrator.Index{
+					TableName:       stmt.Table,
+					NameValue:       r.IndexName,
+					ColumnList:      nil,
+					PrimaryKeyValue: r.IsPrimaryKey,
+					UniqueValue:     r.IsUnique,
+				}
+			}
+			idx.ColumnList = append(idx.ColumnList, r.ColumnName)
+			indexMap[r.IndexName] = idx
+		}
+		for _, idx := range indexMap {
+			indexes = append(indexes, idx)
+		}
+		return nil
+	})
+	return indexes, err
 }
 
 func (m spannerMigrator) DropIndex(value interface{}, name string) error {

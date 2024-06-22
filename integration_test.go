@@ -265,3 +265,119 @@ func TestIntegration_CommitTimestamp(t *testing.T) {
 		t.Fatalf("missing commit timestamp for singer")
 	}
 }
+
+func TestIntegration_CreateIndex(t *testing.T) {
+	skipIfShort(t)
+	t.Parallel()
+	dsn, cleanup, err := testutil.CreateTestDB(context.Background())
+	if err != nil {
+		log.Fatalf("could not init integration tests while creating database: %v", err)
+	}
+	defer cleanup()
+	// Open db.
+	db, err := gorm.Open(New(Config{
+		DriverName: "spanner",
+		DSN:        dsn,
+	}), &gorm.Config{PrepareStmt: true})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	type Accountant struct {
+		gorm.Model
+
+		Email string `gorm:"not null"`
+		Name  string
+	}
+	if err := db.Migrator().CreateTable(&Accountant{}); err != nil {
+		t.Fatalf("Failed to create table, got error: %v", err)
+	}
+
+	// Get all indexes for the Accountant table
+	hasIndex := db.Migrator().HasIndex(&Accountant{}, "email_idx")
+
+	// Ensure that the index does not exist
+	require.False(t, hasIndex)
+
+	// Create index
+	type AccountantIndex struct {
+		Email string `gorm:"index:email_idx"`
+	}
+
+	if err := db.Table("accountants").Migrator().CreateIndex(&AccountantIndex{}, "email_idx"); err != nil {
+		t.Fatalf("Failed to create index, got error: %v", err)
+	}
+
+	// Get all indexes for the Accountant table
+	hasIndex = db.Migrator().HasIndex(&Accountant{}, "email_idx")
+
+	// Ensure that the index is created
+	require.True(t, hasIndex)
+}
+
+func TestIntegration_GetIndexes(t *testing.T) {
+	skipIfShort(t)
+	t.Parallel()
+	dsn, cleanup, err := testutil.CreateTestDB(context.Background())
+	if err != nil {
+		log.Fatalf("could not init integration tests while creating database: %v", err)
+	}
+	defer cleanup()
+	// Open db.
+	db, err := gorm.Open(New(Config{
+		DriverName: "spanner",
+		DSN:        dsn,
+	}), &gorm.Config{PrepareStmt: true})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	type Accountant struct {
+		gorm.Model
+
+		Email string `gorm:"not null;index:email_idx"`
+		Name  string
+	}
+
+	if err := db.AutoMigrate(&Accountant{}); err != nil {
+		t.Fatalf("Failed to migrate with default value, got error: %v", err)
+	}
+
+	// Get all indexes for the Accountant table
+	indexes, err := db.Migrator().GetIndexes(&Accountant{})
+	if err != nil {
+		t.Fatalf("Failed to get indexes, got error: %v", err)
+	}
+
+	// Check if indexes is not nil and has at least one index
+	if indexes == nil || len(indexes) == 0 {
+		t.Fatalf("Failed to get indexes, got: %v", indexes)
+	}
+
+	// Create a map of indices
+	// Keys are index names
+	columnIndices := map[string]gorm.Index{}
+	for _, index := range indexes {
+		columnIndices[index.Name()] = index
+	}
+
+	// Check if the map is not empty
+	require.Conditionf(t, func() (success bool) {
+		return len(columnIndices) > 0
+	}, "Indexes should not be empty")
+
+	// Check if the map has the index email_idx
+	require.Conditionf(t, func() (success bool) {
+		return columnIndices["email_idx"] != nil
+	}, "Index email_idx should exist")
+
+	// Check if the index email_idx has 1 column
+	require.Conditionf(t, func() (success bool) {
+		return len(columnIndices["email_idx"].Columns()) == 1
+	}, "Index email_idx should have 1 column")
+
+	// Check if the index email_idx has column email
+	require.Conditionf(t, func() (success bool) {
+		return columnIndices["email_idx"].Columns()[0] == "email"
+	}, "Index email_idx should have column email")
+}
