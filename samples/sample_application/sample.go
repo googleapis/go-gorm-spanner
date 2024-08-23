@@ -15,7 +15,6 @@
 package samples
 
 import (
-	"cloud.google.com/go/spanner"
 	"context"
 	"database/sql"
 	_ "embed"
@@ -27,6 +26,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/civil"
+	"cloud.google.com/go/spanner"
 	spannergorm "github.com/googleapis/go-gorm-spanner"
 	_ "github.com/googleapis/go-sql-spanner"
 	"gorm.io/gorm"
@@ -111,13 +111,13 @@ func RunSample(w io.Writer, connString string) error {
 		return fmt.Errorf("failed to migrate: %w", err)
 	}
 
-	fmt.Fprintf(w, "Starting sample...")
+	_, _ = fmt.Fprintln(w, "Starting sample...")
 
 	// Delete all existing data to start with a clean database.
 	if err := DeleteAllData(db); err != nil {
 		return fmt.Errorf("failed to delete all data: %w", err)
 	}
-	fmt.Fprintf(w, "Purged all existing test data\n\n")
+	_, _ = fmt.Fprintf(w, "Purged all existing test data\n\n")
 
 	// Create some random Singers, Albums and Tracks.
 	if err := CreateRandomSingersAndAlbums(w, db); err != nil {
@@ -188,13 +188,13 @@ func RunSample(w io.Writer, connString string) error {
 		return err
 	}
 
-	fmt.Fprintf(w, "Finished running sample\n")
+	_, _ = fmt.Fprintln(w, "Finished running sample")
 	return nil
 }
 
 // CreateRandomSingersAndAlbums creates some random test records and stores these in the database.
 func CreateRandomSingersAndAlbums(w io.Writer, db *gorm.DB) error {
-	fmt.Fprintf(w, "Creating random singers and albums")
+	_, _ = fmt.Fprintln(w, "Creating random singers and albums")
 	if err := db.Transaction(func(tx *gorm.DB) error {
 		// Create between 5 and 10 random singers.
 		for i := 0; i < randInt(5, 10); i++ {
@@ -202,47 +202,47 @@ func CreateRandomSingersAndAlbums(w io.Writer, db *gorm.DB) error {
 			if err != nil {
 				return fmt.Errorf("failed to create singer: %w", err)
 			}
-			fmt.Fprintf(w, ".")
+			_, _ = fmt.Fprint(w, ".")
 			// Create between 2 and 100 random albums
 			for j := 0; j < randInt(2, 100); j++ {
 				_, err = CreateAlbumWithRandomTracks(db, randAlbumTitle(), singerId, randInt(1, 22))
 				if err != nil {
 					return fmt.Errorf("failed to create album: %w", err)
 				}
-				fmt.Fprintf(w, ".")
+				_, _ = fmt.Fprint(w, ".")
 			}
 		}
 		return nil
 	}); err != nil {
 		return fmt.Errorf("failed to create random singers and albums: %w", err)
 	}
-	fmt.Fprintf(w, "Created random singers and albums\n\n")
+	_, _ = fmt.Fprint(w, "Created random singers and albums\n\n")
 	return nil
 }
 
 // PrintSingersAlbumsAndTracks queries and prints all Singers, Albums and Tracks in the database.
 func PrintSingersAlbumsAndTracks(w io.Writer, db *gorm.DB) error {
-	fmt.Fprintf(w, "Fetching all singers, albums and tracks")
+	_, _ = fmt.Fprintln(w, "Fetching all singers, albums and tracks")
 	var singers []*Singer
 	// Preload all associations of Singer.
 	if err := db.Model(&Singer{}).Preload(clause.Associations).Order("last_name").Find(&singers).Error; err != nil {
 		return fmt.Errorf("failed to load all singers: %w", err)
 	}
 	for _, singer := range singers {
-		fmt.Fprintf(w, "Singer: {%v %v}\n", singer.ID, singer.FullName)
-		fmt.Fprintf(w, "Albums:\n")
+		_, _ = fmt.Fprintf(w, "Singer: {%v %v}\n", singer.ID, singer.FullName)
+		_, _ = fmt.Fprintln(w, "Albums:")
 		for _, album := range singer.Albums {
-			fmt.Fprintf(w, "\tAlbum: {%v %v}\n", album.ID, album.Title)
-			fmt.Fprintf(w, "\tTracks:\n")
+			_, _ = fmt.Fprintf(w, "\tAlbum: {%v %v}\n", album.ID, album.Title)
+			_, _ = fmt.Fprintln(w, "\tTracks:")
 			if err := db.Model(&album).Preload(clause.Associations).Find(&album).Error; err != nil {
 				return fmt.Errorf("failed to load album: %w", err)
 			}
 			for _, track := range album.Tracks {
-				fmt.Fprintf(w, "\t\tTrack: {%v %v}\n", track.TrackNumber, track.Title)
+				_, _ = fmt.Fprintf(w, "\t\tTrack: {%v %v}\n", track.TrackNumber, track.Title)
 			}
 		}
 	}
-	fmt.Fprintf(w, "Fetched all singers, albums and tracks\n\n")
+	_, _ = fmt.Fprint(w, "Fetched all singers, albums and tracks\n\n")
 	return nil
 }
 
@@ -277,7 +277,7 @@ func CreateVenueAndConcertInTransaction(w io.Writer, db *gorm.DB) error {
 	}); err != nil {
 		return fmt.Errorf("failed to create a Venue and a Concert: %w", err)
 	}
-	fmt.Fprintf(w, "Created a Venue and a Concert\n\n")
+	_, _ = fmt.Fprint(w, "Created a Venue and a Concert\n\n")
 	return nil
 }
 
@@ -289,10 +289,10 @@ func PrintConcerts(w io.Writer, db *gorm.DB) error {
 		return fmt.Errorf("failed to load concerts: %w", err)
 	}
 	for _, concert := range concerts {
-		fmt.Fprintf(w, "Concert %q starting at %v will be performed by %v at %v\n",
+		_, _ = fmt.Fprintf(w, "Concert %q starting at %v will be performed by %v at %v\n",
 			concert.Name, concert.StartTime, concert.Singer.FullName, concert.Venue.Name)
 	}
-	fmt.Fprintf(w, "Fetched all concerts\n\n")
+	_, _ = fmt.Fprint(w, "Fetched all concerts\n\n")
 	return nil
 }
 
@@ -314,7 +314,7 @@ func UpdateVenueDescription(w io.Writer, db *gorm.DB) error {
 	}); err != nil {
 		return fmt.Errorf("failed to update Venue 'Avenue Park': %w", err)
 	}
-	fmt.Fprintf(w, "Updated Venue 'Avenue Park'\n\n")
+	_, _ = fmt.Fprint(w, "Updated Venue 'Avenue Park'\n\n")
 	return nil
 }
 
@@ -339,7 +339,7 @@ func FirstOrInitVenue(w io.Writer, db *gorm.DB, name string) error {
 	}); err != nil {
 		return fmt.Errorf("failed to create or update Venue %q: %w", name, err)
 	}
-	fmt.Fprintf(w, "Created or updated Venue %q\n\n", name)
+	_, _ = fmt.Fprintf(w, "Created or updated Venue %q\n\n", name)
 	return nil
 }
 
@@ -357,14 +357,14 @@ func FirstOrCreateVenue(w io.Writer, db *gorm.DB, name string) error {
 	}); err != nil {
 		return fmt.Errorf("failed to create Venue %q if it did not exist: %w", name, err)
 	}
-	fmt.Fprintf(w, "Created Venue %q if it did not exist\n\n", name)
+	_, _ = fmt.Fprintf(w, "Created Venue %q if it did not exist\n\n", name)
 	return nil
 }
 
 // UpdateTracksInBatches uses FindInBatches to iterate through a selection of Tracks in batches and updates each Track
 // that it found.
 func UpdateTracksInBatches(w io.Writer, db *gorm.DB) error {
-	fmt.Fprintf(w, "Updating tracks")
+	_, _ = fmt.Fprintln(w, "Updating tracks")
 	updated := 0
 	if err := db.Transaction(func(tx *gorm.DB) error {
 		var tracks []*Track
@@ -382,19 +382,19 @@ func UpdateTracksInBatches(w io.Writer, db *gorm.DB) error {
 					return fmt.Errorf("update of Track{%v,%v} affected %v rows", track.ID, track.TrackNumber, res.RowsAffected)
 				}
 				updated++
-				fmt.Fprintf(w, ".")
+				_, _ = fmt.Fprint(w, ".")
 			}
 			return nil
 		}).Error
 	}); err != nil {
 		return fmt.Errorf("failed to batch fetch and update tracks: %w", err)
 	}
-	fmt.Fprintf(w, "\nUpdated %v tracks\n\n", updated)
+	_, _ = fmt.Fprintf(w, "\nUpdated %v tracks\n\n", updated)
 	return nil
 }
 
 func PrintAlbumsReleaseBefore1900(w io.Writer, db *gorm.DB) error {
-	fmt.Println("Searching for albums released before 1900")
+	_, _ = fmt.Fprintln(w, "Searching for albums released before 1900")
 	var albums []*Album
 	if err := db.Where(
 		"release_date < ?",
@@ -403,18 +403,18 @@ func PrintAlbumsReleaseBefore1900(w io.Writer, db *gorm.DB) error {
 		return fmt.Errorf("failed to load albums: %w", err)
 	}
 	if len(albums) == 0 {
-		fmt.Fprintf(w, "No albums found")
+		_, _ = fmt.Fprintln(w, "No albums found")
 	} else {
 		for _, album := range albums {
-			fmt.Fprintf(w, "Album %q was released at %v\n", album.Title, album.ReleaseDate.String())
+			_, _ = fmt.Fprintf(w, "Album %q was released at %v\n", album.Title, album.ReleaseDate.String())
 		}
 	}
-	fmt.Fprintf(w, "\n\n")
+	_, _ = fmt.Fprint(w, "\n\n")
 	return nil
 }
 
 func PrintSingersWithLimitAndOffset(w io.Writer, db *gorm.DB) error {
-	fmt.Fprintf(w, "Printing all singers ordered by last name")
+	_, _ = fmt.Fprintln(w, "Printing all singers ordered by last name")
 	var singers []*Singer
 	limit := 5
 	offset := 0
@@ -426,11 +426,11 @@ func PrintSingersWithLimitAndOffset(w io.Writer, db *gorm.DB) error {
 			break
 		}
 		for _, singer := range singers {
-			fmt.Fprintf(w, "%v: %v\n", offset, singer.FullName)
+			_, _ = fmt.Fprintf(w, "%v: %v\n", offset, singer.FullName)
 			offset++
 		}
 	}
-	fmt.Fprintf(w, "Found %v singers\n\n", offset)
+	_, _ = fmt.Fprintf(w, "Found %v singers\n\n", offset)
 	return nil
 }
 
@@ -443,22 +443,19 @@ func QueryWithTimeout(w io.Writer, db *gorm.DB) error {
 	var tracks []*Track
 	if err := db.WithContext(ctx).Where("substring(title, 1, 1)='a'").Find(&tracks).Error; err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			fmt.Fprintf(w, "Query failed because of a timeout. This is expected.\n\n")
+			_, _ = fmt.Fprint(w, "Query failed because of a timeout. This is expected.\n\n")
 			return nil
 		}
 		return fmt.Errorf("query failed with an unexpected error, failed to load tracks: %w", err)
 	}
-	fmt.Fprintf(w, "Successfully queried all tracks in 1ms\n\n")
+	_, _ = fmt.Fprint(w, "Successfully queried all tracks in 1ms\n\n")
 	return nil
 }
 
 func PrintAlbumsFirstCharTitleAndFirstOrLastNameEqual(w io.Writer, db *gorm.DB) error {
-	fmt.Fprintf(w, "Searching for albums that have a title that starts with the same character as the first or last name of the singer")
+	_, _ = fmt.Fprintln(w, "Searching for albums that have a title that starts with the same character as the first or last name of the singer")
 	var albums []*Album
 	// Join the Singer association to use it in the Where clause.
-	// Note that `gorm` will use "Singer" (including quotes) as the alias for the singers table.
-	// That means that all references to "Singer" in the query must be quoted, as PostgreSQL treats
-	// the alias as case-sensitive.
 	if err := db.Joins("Singer").Where(
 		`LOWER(SUBSTR(albums.title, 1, 1)) = LOWER(SUBSTR(Singer.first_name, 1, 1))` +
 			`OR LOWER(SUBSTR(albums.title, 1, 1)) = LOWER(SUBSTR(Singer.last_name, 1, 1))`,
@@ -466,31 +463,31 @@ func PrintAlbumsFirstCharTitleAndFirstOrLastNameEqual(w io.Writer, db *gorm.DB) 
 		return fmt.Errorf("failed to load albums: %w", err)
 	}
 	if len(albums) == 0 {
-		fmt.Fprintf(w, "No albums found that match the criteria")
+		_, _ = fmt.Fprintln(w, "No albums found that match the criteria")
 	} else {
 		for _, album := range albums {
-			fmt.Fprintf(w, "Album %q was released by %v\n", album.Title, album.Singer.FullName)
+			_, _ = fmt.Fprintf(w, "Album %q was released by %v\n", album.Title, album.Singer.FullName)
 		}
 	}
-	fmt.Fprintf(w, "\n\n")
+	_, _ = fmt.Fprint(w, "\n\n")
 	return nil
 }
 
 // SearchAlbumsUsingNamedArgument searches for Albums using a named argument.
 func SearchAlbumsUsingNamedArgument(w io.Writer, db *gorm.DB, title string) error {
-	fmt.Fprintf(w, "Searching for albums like %q\n", title)
+	_, _ = fmt.Fprintf(w, "Searching for albums like %q\n", title)
 	var albums []*Album
 	if err := db.Where("title like @title", sql.Named("title", title)).Order("title").Find(&albums).Error; err != nil {
 		return fmt.Errorf("failed to load albums: %w", err)
 	}
 	if len(albums) == 0 {
-		fmt.Fprintf(w, "No albums found that match the criteria")
+		_, _ = fmt.Fprintln(w, "No albums found that match the criteria")
 	} else {
 		for _, album := range albums {
-			fmt.Fprintf(w, "Album %q released at %v\n", album.Title, album.ReleaseDate.String())
+			_, _ = fmt.Fprintf(w, "Album %q released at %v\n", album.Title, album.ReleaseDate.String())
 		}
 	}
-	fmt.Fprintf(w, "\n\n")
+	_, _ = fmt.Fprint(w, "\n\n")
 	return nil
 }
 
@@ -533,9 +530,6 @@ func CreateAlbumWithRandomTracks(db *gorm.DB, albumTitle string, singerId int64,
 		tracks[n] = &Track{Model: gorm.Model{ID: album.ID}, TrackNumber: int64(n + 1), Title: randTrackTitle(), SampleRate: randFloat64(30.0, 60.0)}
 	}
 
-	// Note: The batch size is deliberately kept small here in order to prevent the statement from getting too big and
-	// exceeding the maximum number of parameters in a prepared statement. PGAdapter can currently handle at most 50
-	// parameters in a prepared statement.
 	res = db.CreateInBatches(tracks, 8)
 	return int64(album.ID), res.Error
 }
@@ -561,7 +555,7 @@ func DeleteRandomTrack(w io.Writer, db *gorm.DB) error {
 	}); err != nil {
 		return fmt.Errorf("failed to delete a random track: %w", err)
 	}
-	fmt.Fprintf(w, "Deleted track %q (%q)\n\n", track.ID, track.Title)
+	_, _ = fmt.Fprintf(w, "Deleted track %q (%q)\n\n", track.ID, track.Title)
 	return nil
 }
 
@@ -588,13 +582,65 @@ func DeleteRandomAlbum(w io.Writer, db *gorm.DB) error {
 	}); err != nil {
 		return fmt.Errorf("failed to delete a random album: %w", err)
 	}
-	fmt.Fprintf(w, "Deleted album %q (%q)\n\n", album.ID, album.Title)
+	_, _ = fmt.Fprintf(w, "Deleted album %q (%q)\n\n", album.ID, album.Title)
+	return nil
+}
+
+func UpdateDataWithJsonColumn(w io.Writer, db *gorm.DB) error {
+	if err := db.Save(&Venue{
+		Model:       gorm.Model{ID: 4, CreatedAt: time.Now()},
+		Name:        "Venue 1",
+		Description: "Venue 1 description",
+		VenueDetails: spanner.NullJSON{Value: []VenueDetails{
+			{Name: spanner.NullString{StringVal: "room1", Valid: true}, Open: true},
+			{Name: spanner.NullString{StringVal: "room2", Valid: true}, Open: false},
+		}, Valid: true},
+	}).Error; err != nil {
+		return err
+	}
+	if err := db.Save(&Venue{
+		Model:       gorm.Model{ID: 19, CreatedAt: time.Now()},
+		Name:        "Venue 2",
+		Description: "Venue 2 description",
+		VenueDetails: spanner.NullJSON{Value: VenueDetails{
+			Rating: spanner.NullFloat64{Float64: 9, Valid: true},
+			Open:   true,
+		}, Valid: true},
+	}).Error; err != nil {
+		return err
+	}
+	if err := db.Save(&Venue{
+		Model:       gorm.Model{ID: 42, CreatedAt: time.Now()},
+		Name:        "Venue 3",
+		Description: "Venue 3 description",
+		VenueDetails: spanner.NullJSON{Value: VenueDetails{
+			Name: spanner.NullString{Valid: false},
+			Open: map[string]bool{"monday": true, "tuesday": false},
+			Tags: []spanner.NullString{{StringVal: "large", Valid: true}, {StringVal: "airy", Valid: true}},
+		}, Valid: true},
+	}).Error; err != nil {
+		return err
+	}
+	_, _ = fmt.Fprintln(w, "Updated data to VenueDetails column")
+	return nil
+}
+
+func QueryWithJsonParameter(w io.Writer, db *gorm.DB) error {
+	var venues []Venue
+	if err := db.Find(&venues, "JSON_VALUE(venue_details, '$.rating') = JSON_VALUE(@details, '$.rating')", map[string]interface{}{
+		"details": spanner.NullJSON{Value: VenueDetails{
+			Rating: spanner.NullFloat64{Float64: 9, Valid: true},
+		}, Valid: true},
+	}).Error; err != nil {
+		return err
+	}
+	_, _ = fmt.Fprintf(w, "The venue details for venue id %v is %v\n", venues[0].ID, venues[0].VenueDetails)
 	return nil
 }
 
 // CreateInterleavedTablesIfNotExist creates all tables that are required for this sample if they do not yet exist.
 func CreateInterleavedTablesIfNotExist(w io.Writer, db *gorm.DB) error {
-	fmt.Fprintf(w, "Creating tables...")
+	_, _ = fmt.Fprintln(w, "Creating tables...")
 	// Ignore licence header characters
 	createDataModelSQL = createDataModelSQL[588 : len(createDataModelSQL)-1]
 	ddlStatements := strings.FieldsFunc(string(createDataModelSQL), func(r rune) bool {
@@ -609,7 +655,7 @@ func CreateInterleavedTablesIfNotExist(w io.Writer, db *gorm.DB) error {
 			return fmt.Errorf("failed to execute statement: %w", err)
 		}
 	}
-	fmt.Fprintf(w, "Finished creating interleaved tables")
+	_, _ = fmt.Fprintln(w, "Finished creating interleaved tables")
 	return nil
 }
 

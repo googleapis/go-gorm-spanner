@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package samples
+package emulator
 
 import (
 	"context"
@@ -25,8 +25,8 @@ import (
 	databasepb "cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
 	instance "cloud.google.com/go/spanner/admin/instance/apiv1"
 	instancepb "cloud.google.com/go/spanner/admin/instance/apiv1/instancepb"
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 )
@@ -76,7 +76,7 @@ func startEmulator() error {
 		return err
 	}
 	// Pull the Spanner Emulator docker image.
-	if _, err := cli.ImagePull(ctx, "gcr.io/cloud-spanner-emulator/emulator", types.ImagePullOptions{}); err != nil {
+	if _, err := cli.ImagePull(ctx, "gcr.io/cloud-spanner-emulator/emulator", image.PullOptions{}); err != nil {
 		return err
 	}
 	// Create and start a container with the emulator.
