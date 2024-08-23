@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/googleapis/go-gorm-spanner/compare/v1.2.2...v1.3.0) (2024-08-23)
+
+
+### Features
+
+* Support migrator.GetIndexes ([#112](https://github.com/googleapis/go-gorm-spanner/issues/112)) ([08fa9fa](https://github.com/googleapis/go-gorm-spanner/commit/08fa9fa01f3f8db2737d38a1deba395d48e61524)), refs [#69](https://github.com/googleapis/go-gorm-spanner/issues/69)
+
 ## [1.2.2](https://github.com/googleapis/go-gorm-spanner/compare/v1.2.1...v1.2.2) (2024-06-03)
 
 
