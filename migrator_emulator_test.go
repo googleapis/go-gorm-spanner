@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 	"log"
+	"reflect"
 	"testing"
 	"time"
 
@@ -28,6 +29,7 @@ import (
 	"github.com/shopspring/decimal"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/migrator"
 )
 
 type Singer struct {
@@ -74,8 +76,8 @@ type Concert struct {
 	VenueId   int64
 	Singer    Singer
 	SingerId  int64
-	StartTime time.Time
-	EndTime   time.Time
+	StartTime time.Time `gorm:"index:idx_concerts_time"`
+	EndTime   time.Time `gorm:"index:idx_concerts_time"`
 }
 
 // The tests in this file are only executed on the emulator, as they would be relatively slow
@@ -119,6 +121,9 @@ func TestAutoMigrate_CreateDataModel(t *testing.T) {
 		t.Fatal(err)
 	}
 	verifyDatabaseSchema(t, dsn)
+
+	// Verify the return value of GetIndexes.
+	verifyGetIndexes(t, db)
 }
 
 func verifyDatabaseSchema(t *testing.T, dsn string) {
@@ -133,7 +138,7 @@ func verifyDatabaseSchema(t *testing.T, dsn string) {
 	if err != nil {
 		t.Fatalf("failed to get database DDL: %v", err)
 	}
-	if g, w := len(resp.GetStatements()), 15; g != w {
+	if g, w := len(resp.GetStatements()), 16; g != w {
 		t.Errorf("ddl statement count mismatch\n Got: %v\nWant: %v", g, w)
 	}
 	altCreateConcerts := "CREATE TABLE concerts (\n  id INT64 DEFAULT (GET_NEXT_SEQUENCE_VALUE(Sequence concerts_seq)),\n  created_at TIMESTAMP,\n  updated_at TIMESTAMP,\n  deleted_at TIMESTAMP,\n  name STRING(MAX),\n  venue_id INT64,\n  singer_id INT64,\n  start_time TIMESTAMP,\n  end_time TIMESTAMP,\n  CONSTRAINT fk_singers_concerts FOREIGN KEY(singer_id) REFERENCES singers(id),\n  CONSTRAINT fk_venues_concerts FOREIGN KEY(venue_id) REFERENCES venues(id),\n) PRIMARY KEY(id)"
@@ -153,6 +158,7 @@ func verifyDatabaseSchema(t *testing.T, dsn string) {
 		"CREATE INDEX idx_venues_deleted_at ON venues(deleted_at)",
 		"CREATE TABLE concerts (\n  id INT64 DEFAULT (GET_NEXT_SEQUENCE_VALUE(Sequence concerts_seq)),\n  created_at TIMESTAMP,\n  updated_at TIMESTAMP,\n  deleted_at TIMESTAMP,\n  name STRING(MAX),\n  venue_id INT64,\n  singer_id INT64,\n  start_time TIMESTAMP,\n  end_time TIMESTAMP,\n  CONSTRAINT fk_venues_concerts FOREIGN KEY(venue_id) REFERENCES venues(id),\n  CONSTRAINT fk_singers_concerts FOREIGN KEY(singer_id) REFERENCES singers(id),\n) PRIMARY KEY(id)",
 		"CREATE INDEX idx_concerts_deleted_at ON concerts(deleted_at)",
+		"CREATE INDEX idx_concerts_time ON concerts(start_time, end_time)",
 	} {
 		if g, w := resp.GetStatements()[i], ddl; g != w {
 			// Workaround for the fact that the DDL printer prints constraints in non-deterministic order.
@@ -163,5 +169,58 @@ func verifyDatabaseSchema(t *testing.T, dsn string) {
 			t.Errorf("%d: ddl mismatch\n Got: %v\nWant: %v", i, g, w)
 		}
 	}
+}
 
+func verifyGetIndexes(t *testing.T, db *gorm.DB) {
+	singerIndexes, err := db.Migrator().GetIndexes("singers")
+	if err != nil {
+		t.Fatalf("failed to get indexes for singers: %v", err)
+	}
+	if !reflect.DeepEqual(singerIndexes, []gorm.Index{
+		&migrator.Index{
+			TableName:       "singers",
+			NameValue:       "PRIMARY_KEY",
+			UniqueValue:     sql.NullBool{Valid: true, Bool: true},
+			PrimaryKeyValue: sql.NullBool{Valid: true, Bool: true},
+			ColumnList:      []string{"id"},
+		},
+		&migrator.Index{
+			TableName:       "singers",
+			NameValue:       "idx_singers_deleted_at",
+			UniqueValue:     sql.NullBool{Valid: true, Bool: false},
+			PrimaryKeyValue: sql.NullBool{Valid: true, Bool: false},
+			ColumnList:      []string{"deleted_at"},
+		},
+	}) {
+		t.Fatalf("singers GetIndexes mismatch: %v", singerIndexes)
+	}
+	concertIndexes, err := db.Migrator().GetIndexes("concerts")
+	if err != nil {
+		t.Fatalf("failed to get indexes for concerts: %v", err)
+	}
+	if !reflect.DeepEqual(concertIndexes, []gorm.Index{
+		&migrator.Index{
+			TableName:       "concerts",
+			NameValue:       "PRIMARY_KEY",
+			UniqueValue:     sql.NullBool{Valid: true, Bool: true},
+			PrimaryKeyValue: sql.NullBool{Valid: true, Bool: true},
+			ColumnList:      []string{"id"},
+		},
+		&migrator.Index{
+			TableName:       "concerts",
+			NameValue:       "idx_concerts_deleted_at",
+			UniqueValue:     sql.NullBool{Valid: true, Bool: false},
+			PrimaryKeyValue: sql.NullBool{Valid: true, Bool: false},
+			ColumnList:      []string{"deleted_at"},
+		},
+		&migrator.Index{
+			TableName:       "concerts",
+			NameValue:       "idx_concerts_time",
+			UniqueValue:     sql.NullBool{Valid: true, Bool: false},
+			PrimaryKeyValue: sql.NullBool{Valid: true, Bool: false},
+			ColumnList:      []string{"start_time", "end_time"},
+		},
+	}) {
+		t.Fatalf("concerts GetIndexes mismatch: %v", concertIndexes)
+	}
 }
