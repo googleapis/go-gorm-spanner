@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 	_ "embed"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -443,7 +444,7 @@ func QueryWithTimeout(w io.Writer, db *gorm.DB) error {
 	var tracks []*Track
 	if err := db.WithContext(ctx).Where("substring(title, 1, 1)='a'").Find(&tracks).Error; err != nil {
 		code := spanner.ErrCode(err)
-		if code == codes.DeadlineExceeded {
+		if code == codes.DeadlineExceeded || errors.Is(err, context.DeadlineExceeded) {
 			_, _ = fmt.Fprint(w, "Query failed because of a timeout. This is expected.\n\n")
 			return nil
 		}
