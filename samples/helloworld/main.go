@@ -19,7 +19,7 @@ import (
 	"fmt"
 
 	spannergorm "github.com/googleapis/go-gorm-spanner"
-	"github.com/googleapis/go-gorm-spanner/samples"
+	"github.com/googleapis/go-gorm-spanner/samples/emulator"
 	_ "github.com/googleapis/go-sql-spanner"
 	"gorm.io/gorm"
 )
@@ -51,5 +51,5 @@ func helloWorld(projectId, instanceId, databaseId string) error {
 }
 
 func main() {
-	samples.RunSampleOnEmulator(helloWorld)
+	emulator.RunSampleOnEmulator(helloWorld)
 }
