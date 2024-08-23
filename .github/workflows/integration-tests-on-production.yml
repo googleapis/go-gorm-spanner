@@ -39,7 +39,7 @@ jobs:
           SPANNER_TEST_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
           SPANNER_TEST_INSTANCE: test-instance
       - name: Run samples tests on production
-        working-directory: ./samples
+        working-directory: ./samples/sample_application
         run: |
           go mod tidy
           go test -v -timeout 45m ./... -run '^TestIntegration_'
