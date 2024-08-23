@@ -17,6 +17,7 @@ package gorm
 import (
 	"database/sql"
 	"fmt"
+	"sort"
 	"strings"
 
 	"gorm.io/gorm"
@@ -45,6 +46,14 @@ type spannerMigrator struct {
 type spannerColumnType struct {
 	migrator.ColumnType
 	GenerationExpression sql.NullString
+}
+
+type Index struct {
+	TableName    string
+	ColumnName   string
+	IndexName    string
+	IsUnique     sql.NullBool
+	IsPrimaryKey sql.NullBool
 }
 
 func (m spannerMigrator) CurrentDatabase() (name string) {
@@ -218,6 +227,64 @@ func (m spannerMigrator) HasIndex(value interface{}, name string) bool {
 	})
 
 	return count > 0
+}
+
+func (m spannerMigrator) GetIndexes(value interface{}) ([]gorm.Index, error) {
+	const indexSQL = `
+	SELECT 
+		i.index_name,
+		i.is_unique,
+		i.index_type = 'PRIMARY_KEY' as is_primary_key,
+		i.index_type,
+		col.column_name
+	FROM
+		information_schema.indexes i
+		INNER JOIN information_schema.index_columns ic
+		     ON ic.table_catalog = i.table_catalog
+		    AND ic.table_schema =  i.table_schema
+		    AND ic.table_name =    i.table_name
+		    AND ic.index_name =    i.index_name
+		INNER JOIN information_schema.columns col
+		    ON  col.column_name = ic.column_name
+		    AND col.table_name  = ic.table_name
+	        AND col.table_schema = ic.table_schema
+	        AND col.table_catalog = ic.table_catalog
+	WHERE i.spanner_is_managed = false
+	  AND i.table_schema = ?
+	  AND i.table_name = ?
+	ORDER BY i.table_catalog, i.table_schema, i.table_name, i.index_name, ic.ordinal_position
+	`
+	indexes := make([]gorm.Index, 0)
+	err := m.RunWithValue(value, func(stmt *gorm.Statement) error {
+		currentDatabase := m.DB.Migrator().CurrentDatabase()
+		result := make([]*Index, 0)
+		if err := m.DB.Raw(indexSQL, currentDatabase, stmt.Table).Scan(&result).Error; err != nil {
+			return err
+		}
+		indexMap := make(map[string]*migrator.Index)
+		for _, r := range result {
+			idx, ok := indexMap[r.IndexName]
+			if !ok {
+				idx = &migrator.Index{
+					TableName:       stmt.Table,
+					NameValue:       r.IndexName,
+					ColumnList:      nil,
+					PrimaryKeyValue: r.IsPrimaryKey,
+					UniqueValue:     r.IsUnique,
+				}
+			}
+			idx.ColumnList = append(idx.ColumnList, r.ColumnName)
+			indexMap[r.IndexName] = idx
+		}
+		for _, idx := range indexMap {
+			indexes = append(indexes, idx)
+		}
+		sort.Slice(indexes, func(i, j int) bool {
+			return indexes[i].Name() < indexes[j].Name()
+		})
+		return nil
+	})
+	return indexes, err
 }
 
 func (m spannerMigrator) DropIndex(value interface{}, name string) error {
