@@ -124,6 +124,20 @@ func TestAutoMigrate_CreateDataModel(t *testing.T) {
 
 	// Verify the return value of GetIndexes.
 	verifyGetIndexes(t, db)
+
+	// Verify that we can manually create an index.
+	type singer struct {
+		LastName string `gorm:"index:idx_singers_last_name"`
+	}
+	if db.Migrator().HasIndex(&singer{}, "idx_singers_last_name") {
+		t.Fatalf("singers already has an index on last_name")
+	}
+	if err := db.Migrator().CreateIndex(&singer{}, "idx_singers_last_name"); err != nil {
+		t.Fatalf("failed to create index on singers.last_name: %v", err)
+	}
+	if !db.Migrator().HasIndex(&singer{}, "idx_singers_last_name") {
+		t.Fatalf("idx_singers_last_name not found")
+	}
 }
 
 func verifyDatabaseSchema(t *testing.T, dsn string) {
