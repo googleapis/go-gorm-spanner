@@ -5,14 +5,14 @@ go 1.21
 replace github.com/googleapis/go-gorm-spanner => ../
 
 require (
-	cloud.google.com/go v0.115.0
-	cloud.google.com/go/spanner v1.63.0
+	cloud.google.com/go v0.115.1
+	cloud.google.com/go/spanner v1.67.0
 	github.com/docker/docker v26.1.4+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/googleapis/go-gorm-spanner v1.2.2
-	github.com/googleapis/go-sql-spanner v1.4.0
+	github.com/googleapis/go-sql-spanner v1.7.0
 	github.com/stretchr/testify v1.9.0
-	gorm.io/gorm v1.25.10
+	gorm.io/gorm v1.25.11
 )
 
 require (

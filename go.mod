@@ -3,16 +3,16 @@ module github.com/googleapis/go-gorm-spanner
 go 1.20
 
 require (
-	cloud.google.com/go/longrunning v0.5.7
-	cloud.google.com/go/spanner v1.63.0
-	github.com/googleapis/go-sql-spanner v1.4.0
+	cloud.google.com/go/longrunning v0.6.0
+	cloud.google.com/go/spanner v1.67.0
+	github.com/googleapis/go-sql-spanner v1.7.0
 	github.com/shopspring/decimal v1.4.0
 	github.com/stretchr/testify v1.9.0
-	google.golang.org/api v0.185.0
+	google.golang.org/api v0.194.0
 	google.golang.org/grpc v1.64.0
 	google.golang.org/protobuf v1.34.2
 	gorm.io/datatypes v1.2.1
-	gorm.io/gorm v1.25.10
+	gorm.io/gorm v1.25.11
 )
 
 require (
