@@ -18,7 +18,6 @@ import (
 	"context"
 	"database/sql"
 	_ "embed"
-	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -29,6 +28,7 @@ import (
 	"cloud.google.com/go/spanner"
 	spannergorm "github.com/googleapis/go-gorm-spanner"
 	_ "github.com/googleapis/go-sql-spanner"
+	"google.golang.org/grpc/codes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -442,7 +442,8 @@ func QueryWithTimeout(w io.Writer, db *gorm.DB) error {
 
 	var tracks []*Track
 	if err := db.WithContext(ctx).Where("substring(title, 1, 1)='a'").Find(&tracks).Error; err != nil {
-		if errors.Is(err, context.DeadlineExceeded) {
+		code := spanner.ErrCode(err)
+		if code == codes.DeadlineExceeded {
 			_, _ = fmt.Fprint(w, "Query failed because of a timeout. This is expected.\n\n")
 			return nil
 		}
