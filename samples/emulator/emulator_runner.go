@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package samples
+package emulator
 
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"time"
@@ -76,7 +77,14 @@ func startEmulator() error {
 		return err
 	}
 	// Pull the Spanner Emulator docker image.
-	if _, err := cli.ImagePull(ctx, "gcr.io/cloud-spanner-emulator/emulator", types.ImagePullOptions{}); err != nil {
+	reader, err := cli.ImagePull(ctx, "gcr.io/cloud-spanner-emulator/emulator", types.ImagePullOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = reader.Close() }()
+	// cli.ImagePull is asynchronous.
+	// The reader needs to be read completely for the pull operation to complete.
+	if _, err := io.Copy(io.Discard, reader); err != nil {
 		return err
 	}
 	// Create and start a container with the emulator.
@@ -90,7 +98,7 @@ func startEmulator() error {
 		return err
 	}
 	containerId = resp.ID
-	if err := cli.ContainerStart(ctx, containerId, types.ContainerStartOptions{}); err != nil {
+	if err := cli.ContainerStart(ctx, containerId, container.StartOptions{}); err != nil {
 		return err
 	}
 	// Wait max 10 seconds or until the emulator is running.

@@ -230,6 +230,9 @@ func (dialector Dialector) DataTypeOf(field *schema.Field) string {
 	case schema.Int, schema.Uint:
 		return "INT64"
 	case schema.Float:
+		if field.Size == 32 {
+			return "FLOAT32"
+		}
 		return "FLOAT64"
 	case schema.String:
 		var size string

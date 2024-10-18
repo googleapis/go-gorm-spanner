@@ -77,28 +77,29 @@ releases. They are currently compatible with:
 ## Data Types
 Cloud Spanner supports the following data types in combination with `gorm`.
 
-| Cloud Spanner Type       | gorm / go type             |
-|--------------------------|----------------------------|
-| bool                     | bool, sql.NullBool         |
-| int64                    | uint, int64, sql.NullInt64 |
-| string                   | string, sql.NullString     |
-| json                     | string, sql.NullString     |
-| float64                  | float64, sql.NullFloat64   |
-| numeric                  | decimal.NullDecimal        |
-| timestamp with time zone | time.Time, sql.NullTime    |
-| date                     | datatypes.Date             |
-| bytes                    | []byte                     |
+| Cloud Spanner Type       | gorm / go type               |
+|--------------------------|------------------------------|
+| bool                     | bool, sql.NullBool           |
+| int64                    | uint, int64, sql.NullInt64   |
+| string                   | string, sql.NullString       |
+| json                     | spanner.NullJSON             |
+| float64                  | float64, sql.NullFloat64     |
+| float32                  | float32, spanner.NullFloat32 |
+| numeric                  | decimal.NullDecimal          |
+| timestamp with time zone | time.Time, sql.NullTime      |
+| date                     | datatypes.Date               |
+| bytes                    | []byte                       |
 
 
 ## Limitations
 The Cloud Spanner `gorm` dialect has the following known limitations:
 
-| Limitation                                                                                     | Workaround                                                                                                                                                                                                             |
-|------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Nested transactions                                                                            | Nested transactions and savepoints are not supported. It is therefore recommended to set the configuration option `DisableNestedTransaction: true,`                                                                    |
-| Locking                                                                                        | Lock clauses (e.g. `clause.Locking{Strength: "UPDATE"}`) are not supported. These are generally speaking also not required, as the default isolation level that is used by Cloud Spanner is serializable.              |
-| [gorm.Automigrate](https://gorm.io/docs/migration.html#Auto-Migration) with interleaved tables | [Interleaved tables](samples/interleave) are supported by the Cloud Spanner `gorm` dialect, but Auto-Migration does not support interleaved tables. It is therefore recommended to create interleaved tables manually. |
-| [Cloud Spanner stale reads](https://cloud.google.com/spanner/docs/reads#go)                    | Stale reads are not supported by gorm.                                                                                                                                                                                 |    
+| Limitation                                                                                     | Workaround                                                                                                                                                                                                                     |
+|------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Nested transactions                                                                            | Nested transactions and savepoints are not supported. It is therefore recommended to set the configuration option `DisableNestedTransaction: true,`                                                                            |
+| Locking                                                                                        | Lock clauses (e.g. `clause.Locking{Strength: "UPDATE"}`) are not supported. These are generally speaking also not required, as the default isolation level that is used by Cloud Spanner is serializable.                      |
+| [gorm.Automigrate](https://gorm.io/docs/migration.html#Auto-Migration) with interleaved tables | [Interleaved tables](samples/sample_application) are supported by the Cloud Spanner `gorm` dialect, but Auto-Migration does not support interleaved tables. It is therefore recommended to create interleaved tables manually. |
+| [Cloud Spanner stale reads](https://cloud.google.com/spanner/docs/reads#go)                    | Stale reads are not supported by gorm.                                                                                                                                                                                         |    
 
 For the complete list of the limitations, see the [Cloud Spanner GORM limitations](https://github.com/googleapis/go-gorm-spanner/blob/main/docs/limitations.md).
 

@@ -2,6 +2,17 @@
   "extends": [
     "config:base",
     "schedule:weekly",
-    ":disableDependencyDashboard"
-  ]
+    ":disableDependencyDashboard",
+    "docker:disable"
+  ],
+  "semanticCommits": false,
+  "postUpdateOptions": [
+    "gomodTidy"
+  ],
+  "commitMessagePrefix": "chore: ",
+  "commitMessageAction": "update",
+  "groupName": "deps",
+  "constraints": {
+      "go": "1.20"
+  }
 }

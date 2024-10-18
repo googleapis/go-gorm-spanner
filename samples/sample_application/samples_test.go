@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package samples_test
+package samples
 
 import (
 	"bytes"
@@ -28,7 +28,6 @@ import (
 	"gorm.io/gorm/logger"
 
 	spannergorm "github.com/googleapis/go-gorm-spanner"
-	"github.com/googleapis/go-gorm-spanner/samples/interleave"
 	"github.com/googleapis/go-gorm-spanner/testutil"
 )
 
@@ -49,20 +48,25 @@ func TestIntegration_Sample(t *testing.T) {
 		DSN:        dsn,
 	}), &gorm.Config{PrepareStmt: true, IgnoreRelationshipsWhenMigrating: true, Logger: logger.Default.LogMode(logger.Error)})
 	require.NoError(t, err)
-	require.NoError(t, samples.CreateInterleavedTablesIfNotExist(os.Stdout, db))
-	require.NoError(t, db.AutoMigrate(&samples.Venue{}, &samples.Concert{}))
-	require.NoError(t, samples.DeleteAllData(db))
+	require.NoError(t, CreateInterleavedTablesIfNotExist(os.Stdout, db))
+	require.NoError(t, db.AutoMigrate(&Venue{}, &Concert{}))
+	require.NoError(t, DeleteAllData(db))
 	var out string
-	out = runSample(t, samples.CreateRandomSingersAndAlbums, db, "failed to create singers and albums")
+	out = runSample(t, CreateRandomSingersAndAlbums, db, "failed to create singers and albums")
 	assertContains(t, out, "Created random singers and albums")
-	out = runSample(t, samples.PrintSingersAlbumsAndTracks, db, "failed to print singers, albums and tracks")
+	out = runSample(t, PrintSingersAlbumsAndTracks, db, "failed to print singers, albums and tracks")
 	assertContains(t, out, "Fetched all singers, albums and tracks")
-	out = runSample(t, samples.CreateVenueAndConcertInTransaction, db, "failed to create venue and concert in transaction")
+	out = runSample(t, CreateVenueAndConcertInTransaction, db, "failed to create venue and concert in transaction")
 	assertContains(t, out, "Created a Venue and a Concert")
-	out = runSample(t, samples.PrintConcerts, db, "failed to fetch concerts")
+	out = runSample(t, PrintConcerts, db, "failed to fetch concerts")
 	assertContains(t, out, "Fetched all concerts")
-	out = runSample(t, samples.PrintAlbumsReleaseBefore1900, db, "failed to fetch albums released before 1900")
+	out = runSample(t, PrintAlbumsReleaseBefore1900, db, "failed to fetch albums released before 1900")
 	assertContains(t, out, "was released at")
+
+	out = runSample(t, UpdateDataWithJsonColumn, db, "failed to update data with json")
+	assertContains(t, out, "Updated data to VenueDetails column\n")
+	out = runSample(t, QueryWithJsonParameter, db, "failed to query with json parameter")
+	assertContains(t, out, "The venue details for venue id 19")
 }
 
 func runSample(t *testing.T, f sampleFunc, db *gorm.DB, errMsg string) string {
