@@ -211,8 +211,14 @@ func TestIntegration_InsertOrUpdate(t *testing.T) {
 		FirstName string
 		LastName  string
 	}
+	type fan struct {
+		gorm.Model
+		Name     string
+		SingerId uint
+		Singer   *singer
+	}
 
-	if err := db.AutoMigrate(&singer{}); err != nil {
+	if err := db.AutoMigrate(&singer{}, &fan{}); err != nil {
 		t.Fatalf("Failed to migrate: %v", err)
 	}
 
@@ -225,15 +231,7 @@ func TestIntegration_InsertOrUpdate(t *testing.T) {
 	// Update the singer model and do an insert-or-update.
 	s.LastName = "baz"
 	if err := db.Clauses(clause.OnConflict{UpdateAll: true}).Create(&s).Error; err != nil {
-		// TODO: Remove when the emulator supports insert-or-update.
-		if testutil.RunsOnEmulator() &&
-			(spanner.ErrCode(err) == codes.AlreadyExists || spanner.ErrCode(err) == codes.Unimplemented) {
-			// This is expected as the emulator does not yet support 'insert or update'.
-			// Simulate it by executing a manual update instead.
-			db.Save(&s)
-		} else {
-			t.Fatalf("failed to update singer: %v", err)
-		}
+		t.Fatalf("failed to update singer: %v", err)
 	}
 	// Verify the value in the database.
 	var s2 singer
@@ -253,13 +251,23 @@ func TestIntegration_InsertOrUpdate(t *testing.T) {
 
 	// Verify that we don't get an error if we try to execute an insert-or-ignore statement.
 	if err := db.Clauses(clause.OnConflict{DoNothing: true}).Create(&s2).Error; err != nil {
-		// TODO: Remove when the emulator supports insert-or-update.
-		if testutil.RunsOnEmulator() &&
-			(spanner.ErrCode(err) == codes.AlreadyExists || spanner.ErrCode(err) == codes.Unimplemented) {
-			// This is expected as the emulator does not yet support 'insert or update'.
-		} else {
-			t.Fatalf("insort-or-ignore failed: %v", err)
-		}
+		t.Fatalf("insort-or-ignore failed: %v", err)
+	}
+
+	// Insert a fan and singer record at once.
+	f := fan{Name: "fan1", Singer: &singer{FirstName: "singer", LastName: "with_fan"}}
+	if err := db.Create(&f).Error; err != nil {
+		t.Fatalf("failed to insert fan: %v", err)
+	}
+	// Verify the values in the database.
+	db.First(&f)
+	if g, w := f.Name, "fan1"; g != w {
+		t.Errorf("Fan name mismatch\n Got: %v\nWant: %v", g, w)
+	}
+	var s3 singer
+	db.Find(&s3, f.SingerId)
+	if g, w := s3.LastName, "with_fan"; g != w {
+		t.Errorf("Singer with fan last name mismatch\n Got: %v\nWant: %v", g, w)
 	}
 }
 
