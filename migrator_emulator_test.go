@@ -157,11 +157,11 @@ func verifyDatabaseSchema(t *testing.T, dsn string) {
 	}
 	altCreateConcerts := "CREATE TABLE concerts (\n  id INT64 DEFAULT (GET_NEXT_SEQUENCE_VALUE(Sequence concerts_seq)),\n  created_at TIMESTAMP,\n  updated_at TIMESTAMP,\n  deleted_at TIMESTAMP,\n  name STRING(MAX),\n  venue_id INT64,\n  singer_id INT64,\n  start_time TIMESTAMP,\n  end_time TIMESTAMP,\n  CONSTRAINT fk_singers_concerts FOREIGN KEY(singer_id) REFERENCES singers(id),\n  CONSTRAINT fk_venues_concerts FOREIGN KEY(venue_id) REFERENCES venues(id),\n) PRIMARY KEY(id)"
 	for i, ddl := range []string{
-		"CREATE SEQUENCE singers_seq OPTIONS (\n  sequence_kind = 'bit_reversed_positive' )",
-		"CREATE SEQUENCE albums_seq OPTIONS (\n  sequence_kind = 'bit_reversed_positive' )",
-		"CREATE SEQUENCE tracks_seq OPTIONS (\n  sequence_kind = 'bit_reversed_positive' )",
-		"CREATE SEQUENCE venues_seq OPTIONS (\n  sequence_kind = 'bit_reversed_positive' )",
-		"CREATE SEQUENCE concerts_seq OPTIONS (\n  sequence_kind = 'bit_reversed_positive' )",
+		"CREATE SEQUENCE singers_seq OPTIONS (\n  sequence_kind = 'bit_reversed_positive')",
+		"CREATE SEQUENCE albums_seq OPTIONS (\n  sequence_kind = 'bit_reversed_positive')",
+		"CREATE SEQUENCE tracks_seq OPTIONS (\n  sequence_kind = 'bit_reversed_positive')",
+		"CREATE SEQUENCE venues_seq OPTIONS (\n  sequence_kind = 'bit_reversed_positive')",
+		"CREATE SEQUENCE concerts_seq OPTIONS (\n  sequence_kind = 'bit_reversed_positive')",
 		"CREATE TABLE singers (\n  id INT64 DEFAULT (GET_NEXT_SEQUENCE_VALUE(Sequence singers_seq)),\n  created_at TIMESTAMP,\n  updated_at TIMESTAMP,\n  deleted_at TIMESTAMP,\n  first_name STRING(MAX),\n  last_name STRING(MAX),\n  full_name STRING(MAX) AS (concat(coalesce(first_name, ''),' ',last_name)) STORED,\n  active BOOL,\n) PRIMARY KEY(id)",
 		"CREATE INDEX idx_singers_deleted_at ON singers(deleted_at)",
 		"CREATE TABLE albums (\n  id INT64 DEFAULT (GET_NEXT_SEQUENCE_VALUE(Sequence albums_seq)),\n  created_at TIMESTAMP,\n  updated_at TIMESTAMP,\n  deleted_at TIMESTAMP,\n  title STRING(MAX),\n  marketing_budget BOOL,\n  release_date DATE,\n  cover_picture BYTES(MAX),\n  singer_id INT64,\n  CONSTRAINT fk_singers_albums FOREIGN KEY(singer_id) REFERENCES singers(id),\n) PRIMARY KEY(id)",
