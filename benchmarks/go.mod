@@ -2,8 +2,6 @@ module github.com/googleapis/go-gorm-spanner/benchmarks
 
 go 1.21
 
-toolchain go1.23.2
-
 replace github.com/googleapis/go-gorm-spanner => ../
 
 require (
