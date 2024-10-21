@@ -7,6 +7,7 @@ toolchain go1.23.2
 require (
 	cloud.google.com/go/longrunning v0.6.1
 	cloud.google.com/go/spanner v1.70.0
+	github.com/golang/protobuf v1.5.4
 	github.com/googleapis/go-sql-spanner v1.7.4
 	github.com/shopspring/decimal v1.4.0
 	github.com/stretchr/testify v1.9.0
@@ -39,7 +40,6 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-sql-driver/mysql v1.8.1 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
-	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/s2a-go v0.1.8 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.4 // indirect

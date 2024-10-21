@@ -31,6 +31,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/structpb"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 type singer struct {
@@ -327,7 +328,7 @@ func setupTestGormConnectionWithParams(t *testing.T, params string) (db *gorm.DB
 	db, err := gorm.Open(New(Config{
 		DriverName: "spanner",
 		DSN:        fmt.Sprintf("%s/projects/p/instances/i/databases/d?useplaintext=true;%s", server.Address, params),
-	}), &gorm.Config{PrepareStmt: true})
+	}), &gorm.Config{PrepareStmt: true, Logger: logger.Default.LogMode(logger.Silent)})
 	if err != nil {
 		serverTeardown()
 		t.Fatal(err)
