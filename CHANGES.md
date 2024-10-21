@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/googleapis/go-gorm-spanner/compare/v1.3.0...v1.4.0) (2024-10-21)
+
+
+### Features
+
+* INSERT OR UPDATE ([#28](https://github.com/googleapis/go-gorm-spanner/issues/28)) ([df84b30](https://github.com/googleapis/go-gorm-spanner/commit/df84b306affc215a268dbddbc1f3af4ce0fb7e55))
+
 ## [1.3.0](https://github.com/googleapis/go-gorm-spanner/compare/v1.2.2...v1.3.0) (2024-08-23)
 
 
