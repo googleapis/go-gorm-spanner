@@ -15,14 +15,57 @@
 package main
 
 import (
+	_ "embed"
+	"fmt"
 	"os"
+	"strings"
 
 	"github.com/googleapis/go-gorm-spanner/samples/emulator"
 	samples "github.com/googleapis/go-gorm-spanner/samples/sample_application"
+	"github.com/googleapis/go-gorm-spanner/samples/snippets"
 )
 
+//go:embed snippets/sample_model/data_model.sql
+var createDataModelSQL string
+
 func main() {
-	emulator.RunSampleOnEmulator(func(project string, instance string, database string) error {
-		return samples.RunSample(os.Stdout, "projects/"+project+"/instances/"+instance+"/databases/"+database)
+	// Run the larger sample application.
+	if len(os.Args) == 1 {
+		emulator.RunSampleOnEmulator(func(project string, instance string, database string) error {
+			return samples.RunSample(os.Stdout, "projects/"+project+"/instances/"+instance+"/databases/"+database)
+		})
+		return
+	}
+
+	// Get the DDL statements for the sample data model.
+	ddlStatements := strings.FieldsFunc(createDataModelSQL, func(r rune) bool {
+		return r == ';'
 	})
+	// Skip the last (empty) statement.
+	ddlStatements = ddlStatements[0 : len(ddlStatements)-1]
+
+	// Run one of the sample snippets.
+	sample := os.Args[1]
+
+	switch sample {
+	case "hello_world":
+		emulator.RunSampleOnEmulator(snippets.HelloWorld, ddlStatements...)
+	case "insert_data":
+		emulator.RunSampleOnEmulator(snippets.InsertData, ddlStatements...)
+	case "auto_save_associations":
+		emulator.RunSampleOnEmulator(snippets.AutoSaveAssociations, ddlStatements...)
+	case "interleaved_tables":
+		emulator.RunSampleOnEmulator(snippets.InterleavedTables, ddlStatements...)
+	case "read_only_transaction":
+		emulator.RunSampleOnEmulator(snippets.ReadOnlyTransaction, ddlStatements...)
+	case "read_write_transaction":
+		emulator.RunSampleOnEmulator(snippets.ReadWriteTransaction, ddlStatements...)
+	case "aborted_transaction":
+		emulator.RunSampleOnEmulator(snippets.AbortedTransaction, ddlStatements...)
+	case "migrations":
+		emulator.RunSampleOnEmulator(snippets.Migrations)
+	default:
+		fmt.Printf("unknown sample: %s\n", sample)
+		os.Exit(1)
+	}
 }
