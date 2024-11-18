@@ -206,7 +206,7 @@ func TestIntegration_InsertOrUpdate(t *testing.T) {
 		log.Fatal(err)
 	}
 
-	type singer struct {
+	type singerWithFans struct {
 		gorm.Model
 		FirstName string
 		LastName  string
@@ -215,15 +215,15 @@ func TestIntegration_InsertOrUpdate(t *testing.T) {
 		gorm.Model
 		Name     string
 		SingerId uint
-		Singer   *singer
+		Singer   *singerWithFans
 	}
 
-	if err := db.AutoMigrate(&singer{}, &fan{}); err != nil {
+	if err := db.AutoMigrate(&singerWithFans{}, &fan{}); err != nil {
 		t.Fatalf("Failed to migrate: %v", err)
 	}
 
 	// Insert a singer record.
-	s := singer{FirstName: "foo", LastName: "bar"}
+	s := singerWithFans{FirstName: "foo", LastName: "bar"}
 	if err := db.Create(&s).Error; err != nil {
 		t.Fatalf("failed to insert new singer: %v", err)
 	}
@@ -234,7 +234,7 @@ func TestIntegration_InsertOrUpdate(t *testing.T) {
 		t.Fatalf("failed to update singer: %v", err)
 	}
 	// Verify the value in the database.
-	var s2 singer
+	var s2 singerWithFans
 	db.First(&s2)
 	if g, w := s2.LastName, "baz"; g != w {
 		t.Errorf("LastName mismatch\n Got: %v\nWant: %v", g, w)
@@ -255,7 +255,7 @@ func TestIntegration_InsertOrUpdate(t *testing.T) {
 	}
 
 	// Insert a fan and singer record at once.
-	f := fan{Name: "fan1", Singer: &singer{FirstName: "singer", LastName: "with_fan"}}
+	f := fan{Name: "fan1", Singer: &singerWithFans{FirstName: "singer", LastName: "with_fan"}}
 	if err := db.Create(&f).Error; err != nil {
 		t.Fatalf("failed to insert fan: %v", err)
 	}
@@ -264,7 +264,7 @@ func TestIntegration_InsertOrUpdate(t *testing.T) {
 	if g, w := f.Name, "fan1"; g != w {
 		t.Errorf("Fan name mismatch\n Got: %v\nWant: %v", g, w)
 	}
-	var s3 singer
+	var s3 singerWithFans
 	db.Find(&s3, f.SingerId)
 	if g, w := s3.LastName, "with_fan"; g != w {
 		t.Errorf("Singer with fan last name mismatch\n Got: %v\nWant: %v", g, w)
