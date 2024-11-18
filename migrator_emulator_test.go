@@ -29,6 +29,7 @@ import (
 	"github.com/shopspring/decimal"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"gorm.io/gorm/migrator"
 )
 
@@ -46,7 +47,7 @@ type Album struct {
 	gorm.Model
 	Title           string
 	MarketingBudget decimal.NullDecimal
-	ReleaseDate     datatypes.Date
+	ReleaseDate     *datatypes.Date
 	CoverPicture    []byte
 	Singer          Singer
 	SingerId        int64
@@ -55,7 +56,7 @@ type Album struct {
 
 type Track struct {
 	gorm.Model
-	TrackNumber int64
+	TrackNumber uint
 	Title       string
 	SampleRate  float64
 	Album       Album
@@ -137,6 +138,47 @@ func TestAutoMigrate_CreateDataModel(t *testing.T) {
 	}
 	if !db.Migrator().HasIndex(&singer{}, "idx_singers_last_name") {
 		t.Fatalf("idx_singers_last_name not found")
+	}
+
+	// Verify that we can insert some data.
+	s := Singer{
+		FirstName: sql.NullString{String: "First", Valid: true},
+		LastName:  "Last",
+		Active:    true,
+		Albums: []Album{
+			{Title: "Album 1", Tracks: []Track{
+				{TrackNumber: 1, Title: "Track 1"},
+				{TrackNumber: 2, Title: "Track 2"},
+				{TrackNumber: 3, Title: "Track 3"},
+			}},
+		},
+	}
+	db = db.Session(&gorm.Session{FullSaveAssociations: true}).Save(&s)
+	if db.Error != nil {
+		t.Fatal(db.Error)
+	}
+
+	// Read the data back from the database to verify that it was really saved.
+	s2 := Singer{Model: gorm.Model{ID: s.ID}}
+	db.Preload(clause.Associations).Find(&s2)
+	if s2.ID <= 0 {
+		t.Errorf("unexpected singer id: %v", s2.ID)
+	}
+	if len(s2.Albums) == 0 {
+		t.Fatalf("missing albums")
+	}
+	for _, a := range s2.Albums {
+		if a.ID <= 0 {
+			t.Errorf("unexpected album id: %v", a.ID)
+		}
+		for _, track := range a.Tracks {
+			if track.ID <= 0 {
+				t.Errorf("unexpected track id: %v", track.ID)
+			}
+			if track.TrackNumber <= 0 {
+				t.Errorf("unexpected track number: %v", track.TrackNumber)
+			}
+		}
 	}
 }
 
