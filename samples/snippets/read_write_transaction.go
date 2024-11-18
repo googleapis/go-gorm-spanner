@@ -37,7 +37,7 @@ import (
 // Spanner can abort any read/write transaction due to lock conflicts or due to transient
 // failures (e.g. network errors, machine restarts, etc.). Transactions that fail with
 // an Aborted error should be retried. The Spanner gorm dialect provides the helper
-// function `spannergorm.TransactionWithRetryOnAborted` for this.
+// function `spannergorm.RunTransaction` for this.
 //
 // Execute the sample with the command `go run run_sample.go read_write_transaction`
 // from the samples directory.
@@ -57,10 +57,10 @@ func ReadWriteTransaction(projectId, instanceId, databaseId string) error {
 
 	// Execute a read/write transaction. Spanner takes locks for all data that is
 	// read or updated during a read/write transaction.
-	// TransactionWithRetryOnAborted automatically retries the transaction if it
+	// RunTransaction automatically retries the transaction if it
 	// is aborted by Spanner. It is recommended to use this helper function for
 	// all read/write transactions.
-	if err := spannergorm.TransactionWithRetryOnAborted(context.Background(), db, func(tx *gorm.DB) error {
+	if err := spannergorm.RunTransaction(context.Background(), db, func(tx *gorm.DB) error {
 		// Whenever possible, only select the columns and rows that you actually
 		// need in a read/write transaction to prevent taking more locks than
 		// necessary.

@@ -20,6 +20,7 @@ import (
 	"sort"
 	"strings"
 
+	"cloud.google.com/go/spanner"
 	spannerdriver "github.com/googleapis/go-sql-spanner"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -34,7 +35,7 @@ const (
 type SpannerMigrator interface {
 	gorm.Migrator
 
-	AutoMigrateDryRun(values ...interface{}) ([]string, error)
+	AutoMigrateDryRun(values ...interface{}) ([]spanner.Statement, error)
 	StartBatchDDL() error
 	RunBatch() error
 	AbortBatch() error
@@ -63,7 +64,7 @@ func (m spannerMigrator) CurrentDatabase() (name string) {
 	return ""
 }
 
-func (m spannerMigrator) AutoMigrateDryRun(values ...interface{}) ([]string, error) {
+func (m spannerMigrator) AutoMigrateDryRun(values ...interface{}) ([]spanner.Statement, error) {
 	return m.autoMigrate( /* dryRun = */ true, values...)
 }
 
@@ -72,7 +73,7 @@ func (m spannerMigrator) AutoMigrate(values ...interface{}) error {
 	return err
 }
 
-func (m spannerMigrator) autoMigrate(dryRun bool, values ...interface{}) ([]string, error) {
+func (m spannerMigrator) autoMigrate(dryRun bool, values ...interface{}) ([]spanner.Statement, error) {
 	if dryRun || !m.Dialector.Config.DisableAutoMigrateBatching {
 		if err := m.StartBatchDDL(); err != nil {
 			return nil, err
@@ -88,17 +89,18 @@ func (m spannerMigrator) autoMigrate(dryRun bool, values ...interface{}) ([]stri
 			if !ok {
 				return nil, fmt.Errorf("unexpected ConnPool type")
 			}
+			var statements []spanner.Statement
 			if err := conn.Raw(func(driverConn any) error {
 				spannerConn, ok := driverConn.(spannerdriver.SpannerConn)
 				if !ok {
 					return fmt.Errorf("dry-run is only supported for Spanner")
 				}
-				spannerConn.InDDLBatch()
+				statements = spannerConn.GetBatchedStatements()
 				return nil
 			}); err != nil {
 				return nil, err
 			}
-			return nil, m.AbortBatch()
+			return statements, m.AbortBatch()
 		} else {
 			return nil, m.RunBatch()
 		}
@@ -161,6 +163,9 @@ func (m spannerMigrator) CreateTable(values ...interface{}) error {
 						return err
 					}
 					f.DefaultValue = "GET_NEXT_SEQUENCE_VALUE(Sequence " + sequence + ")"
+					// Reset the default value to nothing after finishing migration.
+					//goland:noinspection GoDeferInLoop
+					defer func() { f.DefaultValue = "" }()
 				}
 			}
 			for _, dbName := range stmt.Schema.DBNames {

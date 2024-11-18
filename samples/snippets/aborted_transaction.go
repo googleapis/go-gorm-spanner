@@ -30,7 +30,7 @@ import (
 // due to transient failures (e.g. network errors, machine restarts, etc.).
 //
 // Transactions that fail with an Aborted error should be retried. The Spanner gorm
-// dialect provides the helper function `spannergorm.TransactionWithRetryOnAborted`
+// dialect provides the helper function `spannergorm.RunTransaction`
 // for this. It is recommended to run all read/write transactions using this helper
 // function, or add a similar retry function to your own application.
 //
@@ -50,11 +50,11 @@ func AbortedTransaction(projectId, instanceId, databaseId string) error {
 		return err
 	}
 
-	// TransactionWithRetryOnAborted automatically retries the transaction if it
+	// RunTransaction automatically retries the transaction if it
 	// is aborted by Spanner. It is recommended to use this helper function for
 	// all read/write transactions.
 	attempt := 0
-	if err := spannergorm.TransactionWithRetryOnAborted(context.Background(), db, func(tx *gorm.DB) error {
+	if err := spannergorm.RunTransaction(context.Background(), db, func(tx *gorm.DB) error {
 		attempt++
 		fmt.Printf("Executing attempt %d of the first transaction\n", attempt)
 		// Select the venue row in this transaction.
@@ -86,7 +86,7 @@ func AbortedTransaction(projectId, instanceId, databaseId string) error {
 
 func readAndUpdateVenueInTransaction(db *gorm.DB) error {
 	attempt := 0
-	if err := spannergorm.TransactionWithRetryOnAborted(context.Background(), db, func(tx *gorm.DB) error {
+	if err := spannergorm.RunTransaction(context.Background(), db, func(tx *gorm.DB) error {
 		attempt++
 		fmt.Printf("Executing attempt %d of the second transaction\n", attempt)
 		var venue sample_model.Venue

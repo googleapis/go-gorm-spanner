@@ -25,9 +25,9 @@ import (
 	"gorm.io/gorm"
 )
 
-// TransactionWithRetryOnAborted executes a transaction on Spanner using the given
+// RunTransaction executes a transaction on Spanner using the given
 // gorm database, and retries the transaction if it is aborted by Spanner.
-func TransactionWithRetryOnAborted(
+func RunTransaction(
 	ctx context.Context,
 	db *gorm.DB,
 	fc func(tx *gorm.DB) error,
