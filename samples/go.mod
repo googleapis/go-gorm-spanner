@@ -6,13 +6,13 @@ replace github.com/googleapis/go-gorm-spanner => ../
 
 require (
 	cloud.google.com/go v0.116.0
-	cloud.google.com/go/spanner v1.70.0
+	cloud.google.com/go/spanner v1.73.0
 	github.com/docker/docker v27.3.1+incompatible
 	github.com/docker/go-connections v0.5.0
-	github.com/googleapis/go-gorm-spanner v1.3.0
-	github.com/googleapis/go-sql-spanner v1.7.4
+	github.com/googleapis/go-gorm-spanner v1.4.0
+	github.com/googleapis/go-sql-spanner v1.8.0
 	github.com/stretchr/testify v1.9.0
-	google.golang.org/grpc v1.67.1
+	google.golang.org/grpc v1.68.0
 	gorm.io/gorm v1.25.12
 )
 

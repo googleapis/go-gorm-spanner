@@ -2,18 +2,18 @@ module github.com/googleapis/go-gorm-spanner
 
 go 1.21
 
-toolchain go1.23.2
+toolchain go1.23.3
 
 require (
-	cloud.google.com/go/longrunning v0.6.1
-	cloud.google.com/go/spanner v1.70.0
+	cloud.google.com/go/longrunning v0.6.2
+	cloud.google.com/go/spanner v1.73.0
 	github.com/golang/protobuf v1.5.4
-	github.com/googleapis/go-sql-spanner v1.7.4
+	github.com/googleapis/go-sql-spanner v1.8.0
 	github.com/shopspring/decimal v1.4.0
 	github.com/stretchr/testify v1.9.0
-	google.golang.org/api v0.201.0
-	google.golang.org/grpc v1.67.1
-	google.golang.org/protobuf v1.35.1
+	google.golang.org/api v0.206.0
+	google.golang.org/grpc v1.68.0
+	google.golang.org/protobuf v1.35.2
 	gorm.io/datatypes v1.2.4
 	gorm.io/gorm v1.25.12
 )

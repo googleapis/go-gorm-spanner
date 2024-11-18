@@ -5,12 +5,12 @@ go 1.21
 replace github.com/googleapis/go-gorm-spanner => ../
 
 require (
-	cloud.google.com/go/spanner v1.70.0
+	cloud.google.com/go/spanner v1.73.0
 	github.com/google/uuid v1.6.0
-	github.com/googleapis/go-gorm-spanner v1.3.0
-	github.com/googleapis/go-sql-spanner v1.7.4
-	google.golang.org/genproto v0.0.0-20241015192408-796eee8c2d53
-	google.golang.org/grpc v1.67.1
+	github.com/googleapis/go-gorm-spanner v1.4.0
+	github.com/googleapis/go-sql-spanner v1.8.0
+	google.golang.org/genproto 65e8d215514f
+	google.golang.org/grpc v1.68.0
 	gorm.io/datatypes v1.2.4
 	gorm.io/gorm v1.25.12
 )
