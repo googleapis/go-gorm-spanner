@@ -15,6 +15,8 @@
 package gorm
 
 import (
+	"context"
+	"database/sql"
 	"reflect"
 	"strconv"
 	"testing"
@@ -22,6 +24,8 @@ import (
 	"cloud.google.com/go/spanner/apiv1/spannerpb"
 	structpb "github.com/golang/protobuf/ptypes/struct"
 	"github.com/googleapis/go-sql-spanner/testutil"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -221,6 +225,67 @@ func TestAutoSaveAssociations(t *testing.T) {
 	if g, w := c.Parent.ID, uint(parentId); g != w {
 		t.Fatalf("parent ID mismatch\n Got: %v\nWant: %v", g, w)
 	}
+}
+
+func TestRunTransaction(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	db, server, teardown := setupTestGormConnection(t)
+	defer teardown()
+
+	s := singerWithCommitTimestamp{
+		FirstName: "First",
+		LastName:  "Last",
+	}
+	insertSql := "INSERT INTO `singers` (`first_name`,`last_name`,`last_updated`,`rating`) VALUES (@p1,@p2,PENDING_COMMIT_TIMESTAMP(),@p3) THEN RETURN `id`"
+	_ = putSingerResult(server, insertSql, s)
+	if err := RunTransaction(ctx, db, func(tx *gorm.DB) error {
+		if err := tx.Create(&s).Error; err != nil {
+			return err
+		}
+		return nil
+	}, &sql.TxOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	// Verify that the insert was only executed once.
+	reqs := drainRequestsFromServer(server.TestSpanner)
+	execReqs := requestsOfType(reqs, reflect.TypeOf(&spannerpb.ExecuteSqlRequest{}))
+	insertReqs := filter(execReqs, insertSql)
+	if g, w := len(insertReqs), 1; g != w {
+		t.Fatalf("num requests mismatch\n Got: %v\nWant: %v", g, w)
+	}
+
+	// Run the same transaction again, but now we simulate that Spanner aborted the transaction.
+	server.TestSpanner.PutExecutionTime(testutil.MethodCommitTransaction, testutil.SimulatedExecutionTime{
+		Errors: []error{status.Error(codes.Aborted, "Aborted")},
+	})
+	if err := RunTransaction(ctx, db, func(tx *gorm.DB) error {
+		if err := tx.Create(&s).Error; err != nil {
+			return err
+		}
+		return nil
+	}, &sql.TxOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	// Now verify that the insert was executed twice.
+	reqs = drainRequestsFromServer(server.TestSpanner)
+	execReqs = requestsOfType(reqs, reflect.TypeOf(&spannerpb.ExecuteSqlRequest{}))
+	insertReqs = filter(execReqs, insertSql)
+	if g, w := len(insertReqs), 2; g != w {
+		t.Fatalf("num requests mismatch\n Got: %v\nWant: %v", g, w)
+	}
+}
+
+func filter(requests []interface{}, sql string) (ret []*spannerpb.ExecuteSqlRequest) {
+	for _, i := range requests {
+		if req, ok := i.(*spannerpb.ExecuteSqlRequest); ok {
+			if req.Sql == sql {
+				ret = append(ret, req)
+			}
+		}
+	}
+	return ret
 }
 
 func getLastSql(server *testutil.MockedSpannerInMemTestServer) string {
