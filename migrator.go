@@ -17,6 +17,7 @@ package gorm
 import (
 	"database/sql"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -179,8 +180,16 @@ func (m spannerMigrator) CreateTable(values ...interface{}) error {
 			}
 
 			// Indexes should always be created after the table, as Spanner does not support
-			// inline index creation.
-			for _, idx := range stmt.Schema.ParseIndexes() {
+			// inline index creation. Iterate over the indexes in a fixed order to make the
+			// script outcome deterministic.
+			indexes := stmt.Schema.ParseIndexes()
+			indexNames := make([]string, 0, len(indexes))
+			for name := range indexes {
+				indexNames = append(indexNames, name)
+			}
+			slices.Sort(indexNames)
+			for _, name := range indexNames {
+				idx := indexes[name]
 				defer func(value interface{}, name string) {
 					if errr == nil {
 						errr = tx.Migrator().CreateIndex(value, name)
@@ -188,8 +197,15 @@ func (m spannerMigrator) CreateTable(values ...interface{}) error {
 				}(value, idx.Name)
 			}
 
-			for _, rel := range stmt.Schema.Relationships.Relations {
+			// Iterator over the relationships in a fixed order.
+			relationshipKeys := make([]string, 0, len(stmt.Schema.Relationships.Relations))
+			for key := range stmt.Schema.Relationships.Relations {
+				relationshipKeys = append(relationshipKeys, key)
+			}
+			slices.Sort(relationshipKeys)
+			for _, key := range relationshipKeys {
 				if !m.DB.DisableForeignKeyConstraintWhenMigrating {
+					rel := stmt.Schema.Relationships.Relations[key]
 					if constraint := rel.ParseConstraint(); constraint != nil {
 						if constraint.Schema == stmt.Schema {
 							sql, vars := buildConstraint(constraint)

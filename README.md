@@ -91,6 +91,27 @@ Cloud Spanner supports the following data types in combination with `gorm`.
 | bytes                    | []byte                       |
 
 
+## AutoMigrate Dry Run
+The Spanner `gorm` dialect supports dry-runs for auto-migration. Use this to get the
+DDL statements that would be generated and executed by auto-migration. You can manually
+verify and modify these statements to optimize your data model.
+
+Example:
+
+```go
+tables := []interface{}{&singer{}, &album{}}
+
+// Unwrap the underlying SpannerMigrator interface. This interface supports
+// the `AutoMigrateDryRun` method, which does not actually execute the
+// generated statements, and instead just returns these as an array.
+m := db.Migrator()
+migrator, ok := m.(spannergorm.SpannerMigrator)
+if !ok {
+    return fmt.Errorf("unexpected migrator type: %v", m)
+}
+statements, err := migrator.AutoMigrateDryRun(tables...)
+```
+
 ## Limitations
 The Cloud Spanner `gorm` dialect has the following known limitations:
 

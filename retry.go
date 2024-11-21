@@ -27,11 +27,7 @@ import (
 
 // RunTransaction executes a transaction on Spanner using the given
 // gorm database, and retries the transaction if it is aborted by Spanner.
-func RunTransaction(
-	ctx context.Context,
-	db *gorm.DB,
-	fc func(tx *gorm.DB) error,
-	opts ...*sql.TxOptions) error {
+func RunTransaction(ctx context.Context, db *gorm.DB, fc func(tx *gorm.DB) error, opts ...*sql.TxOptions) error {
 	for {
 		err := db.Transaction(fc, opts...)
 		if err == nil {
