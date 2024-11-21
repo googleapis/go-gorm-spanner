@@ -61,6 +61,10 @@ type Track struct {
 	SampleRate  float64
 	Album       Album
 	AlbumId     int64
+	Test1       uint8
+	Test2       uint16
+	Test3       uint32
+	Test4       uint64
 }
 
 type Venue struct {
@@ -147,9 +151,9 @@ func TestAutoMigrate_CreateDataModel(t *testing.T) {
 		Active:    true,
 		Albums: []Album{
 			{Title: "Album 1", Tracks: []Track{
-				{TrackNumber: 1, Title: "Track 1"},
-				{TrackNumber: 2, Title: "Track 2"},
-				{TrackNumber: 3, Title: "Track 3"},
+				{TrackNumber: 1, Title: "Track 1", Test1: 1, Test2: 2, Test3: 3, Test4: 4},
+				{TrackNumber: 2, Title: "Track 2", Test1: 1, Test2: 2, Test3: 3, Test4: 4},
+				{TrackNumber: 3, Title: "Track 3", Test1: 1, Test2: 2, Test3: 3, Test4: 4},
 			}},
 		},
 	}
@@ -177,6 +181,9 @@ func TestAutoMigrate_CreateDataModel(t *testing.T) {
 			}
 			if track.TrackNumber <= 0 {
 				t.Errorf("unexpected track number: %v", track.TrackNumber)
+			}
+			if track.Test1 <= 0 || track.Test2 <= 0 || track.Test3 <= 0 || track.Test4 <= 0 {
+				t.Errorf("unexpected test number: %v %v %v %v", track.Test1, track.Test2, track.Test3, track.Test4)
 			}
 		}
 	}
@@ -208,7 +215,7 @@ func verifyDatabaseSchema(t *testing.T, dsn string) {
 		"CREATE INDEX idx_singers_deleted_at ON singers(deleted_at)",
 		"CREATE TABLE albums (\n  id INT64 DEFAULT (GET_NEXT_SEQUENCE_VALUE(Sequence albums_seq)),\n  created_at TIMESTAMP,\n  updated_at TIMESTAMP,\n  deleted_at TIMESTAMP,\n  title STRING(MAX),\n  marketing_budget BOOL,\n  release_date DATE,\n  cover_picture BYTES(MAX),\n  singer_id INT64,\n  CONSTRAINT fk_singers_albums FOREIGN KEY(singer_id) REFERENCES singers(id),\n) PRIMARY KEY(id)",
 		"CREATE INDEX idx_albums_deleted_at ON albums(deleted_at)",
-		"CREATE TABLE tracks (\n  id INT64 DEFAULT (GET_NEXT_SEQUENCE_VALUE(Sequence tracks_seq)),\n  created_at TIMESTAMP,\n  updated_at TIMESTAMP,\n  deleted_at TIMESTAMP,\n  track_number INT64,\n  title STRING(MAX),\n  sample_rate FLOAT64,\n  album_id INT64,\n  CONSTRAINT fk_albums_tracks FOREIGN KEY(album_id) REFERENCES albums(id),\n) PRIMARY KEY(id)",
+		"CREATE TABLE tracks (\n  id INT64 DEFAULT (GET_NEXT_SEQUENCE_VALUE(Sequence tracks_seq)),\n  created_at TIMESTAMP,\n  updated_at TIMESTAMP,\n  deleted_at TIMESTAMP,\n  track_number INT64,\n  title STRING(MAX),\n  sample_rate FLOAT64,\n  album_id INT64,\n  test1 INT64,\n  test2 INT64,\n  test3 INT64,\n  test4 INT64,\n  CONSTRAINT fk_albums_tracks FOREIGN KEY(album_id) REFERENCES albums(id),\n) PRIMARY KEY(id)",
 		"CREATE INDEX idx_tracks_deleted_at ON tracks(deleted_at)",
 		"CREATE TABLE venues (\n  id INT64 DEFAULT (GET_NEXT_SEQUENCE_VALUE(Sequence venues_seq)),\n  created_at TIMESTAMP,\n  updated_at TIMESTAMP,\n  deleted_at TIMESTAMP,\n  name STRING(MAX),\n  description JSON,\n) PRIMARY KEY(id)",
 		"CREATE INDEX idx_venues_deleted_at ON venues(deleted_at)",
