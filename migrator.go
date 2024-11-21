@@ -17,9 +17,12 @@ package gorm
 import (
 	"database/sql"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
+	"cloud.google.com/go/spanner"
+	spannerdriver "github.com/googleapis/go-sql-spanner"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"gorm.io/gorm/migrator"
@@ -33,6 +36,7 @@ const (
 type SpannerMigrator interface {
 	gorm.Migrator
 
+	AutoMigrateDryRun(values ...interface{}) ([]spanner.Statement, error)
 	StartBatchDDL() error
 	RunBatch() error
 	AbortBatch() error
@@ -41,6 +45,7 @@ type SpannerMigrator interface {
 type spannerMigrator struct {
 	migrator.Migrator
 	Dialector
+	dryRun bool
 }
 
 type spannerColumnType struct {
@@ -60,21 +65,48 @@ func (m spannerMigrator) CurrentDatabase() (name string) {
 	return ""
 }
 
+func (m spannerMigrator) AutoMigrateDryRun(values ...interface{}) ([]spanner.Statement, error) {
+	return m.autoMigrate( /* dryRun = */ true, values...)
+}
+
 func (m spannerMigrator) AutoMigrate(values ...interface{}) error {
-	if !m.Dialector.Config.DisableAutoMigrateBatching {
+	_, err := m.autoMigrate( /* dryRun = */ false, values...)
+	return err
+}
+
+func (m spannerMigrator) autoMigrate(dryRun bool, values ...interface{}) ([]spanner.Statement, error) {
+	if dryRun || !m.Dialector.Config.DisableAutoMigrateBatching {
 		if err := m.StartBatchDDL(); err != nil {
-			return err
+			return nil, err
 		}
 	}
 	err := m.Migrator.AutoMigrate(values...)
 	if err == nil {
-		if m.Dialector.Config.DisableAutoMigrateBatching {
-			return nil
+		if !dryRun && m.Dialector.Config.DisableAutoMigrateBatching {
+			return nil, nil
+		} else if dryRun {
+			connPool := m.DB.Statement.ConnPool
+			conn, ok := connPool.(*sql.Conn)
+			if !ok {
+				return nil, fmt.Errorf("unexpected ConnPool type")
+			}
+			var statements []spanner.Statement
+			if err := conn.Raw(func(driverConn any) error {
+				spannerConn, ok := driverConn.(spannerdriver.SpannerConn)
+				if !ok {
+					return fmt.Errorf("dry-run is only supported for Spanner")
+				}
+				statements = spannerConn.GetBatchedStatements()
+				return nil
+			}); err != nil {
+				return nil, err
+			}
+			return statements, m.AbortBatch()
 		} else {
-			return m.RunBatch()
+			return nil, m.RunBatch()
 		}
 	}
-	return fmt.Errorf("unexpected return value type: %v", err)
+	return nil, fmt.Errorf("unexpected return value type: %v", err)
 }
 
 func (m spannerMigrator) StartBatchDDL() error {
@@ -132,6 +164,9 @@ func (m spannerMigrator) CreateTable(values ...interface{}) error {
 						return err
 					}
 					f.DefaultValue = "GET_NEXT_SEQUENCE_VALUE(Sequence " + sequence + ")"
+					// Reset the default value to nothing after finishing migration.
+					//goland:noinspection GoDeferInLoop
+					defer func() { f.DefaultValue = "" }()
 				}
 			}
 			for _, dbName := range stmt.Schema.DBNames {
@@ -145,8 +180,16 @@ func (m spannerMigrator) CreateTable(values ...interface{}) error {
 			}
 
 			// Indexes should always be created after the table, as Spanner does not support
-			// inline index creation.
-			for _, idx := range stmt.Schema.ParseIndexes() {
+			// inline index creation. Iterate over the indexes in a fixed order to make the
+			// script outcome deterministic.
+			indexes := stmt.Schema.ParseIndexes()
+			indexNames := make([]string, 0, len(indexes))
+			for name := range indexes {
+				indexNames = append(indexNames, name)
+			}
+			slices.Sort(indexNames)
+			for _, name := range indexNames {
+				idx := indexes[name]
 				defer func(value interface{}, name string) {
 					if errr == nil {
 						errr = tx.Migrator().CreateIndex(value, name)
@@ -154,8 +197,15 @@ func (m spannerMigrator) CreateTable(values ...interface{}) error {
 				}(value, idx.Name)
 			}
 
-			for _, rel := range stmt.Schema.Relationships.Relations {
+			// Iterator over the relationships in a fixed order.
+			relationshipKeys := make([]string, 0, len(stmt.Schema.Relationships.Relations))
+			for key := range stmt.Schema.Relationships.Relations {
+				relationshipKeys = append(relationshipKeys, key)
+			}
+			slices.Sort(relationshipKeys)
+			for _, key := range relationshipKeys {
 				if !m.DB.DisableForeignKeyConstraintWhenMigrating {
+					rel := stmt.Schema.Relationships.Relations[key]
 					if constraint := rel.ParseConstraint(); constraint != nil {
 						if constraint.Schema == stmt.Schema {
 							sql, vars := buildConstraint(constraint)

@@ -8,6 +8,7 @@ require (
 	cloud.google.com/go/longrunning v0.6.2
 	cloud.google.com/go/spanner v1.73.0
 	github.com/golang/protobuf v1.5.4
+	github.com/google/go-cmp v0.6.0
 	github.com/googleapis/go-sql-spanner v1.8.0
 	github.com/shopspring/decimal v1.4.0
 	github.com/stretchr/testify v1.9.0
