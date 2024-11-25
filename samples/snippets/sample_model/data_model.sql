@@ -16,7 +16,7 @@ CREATE INDEX IF NOT EXISTS `idx_singers_deleted_at` ON `singers`(`deleted_at`);
 CREATE SEQUENCE IF NOT EXISTS `albums_seq` OPTIONS (sequence_kind = "bit_reversed_positive");
 
 CREATE TABLE IF NOT EXISTS `albums` (
-    `id` INT64 DEFAULT (GET_NEXT_SEQUENCE_VALUE(Sequence albums_seq)),
+    `album_id` INT64 DEFAULT (GET_NEXT_SEQUENCE_VALUE(Sequence albums_seq)),
     `created_at` TIMESTAMP,
     `updated_at` TIMESTAMP,
     `deleted_at` TIMESTAMP,
@@ -26,19 +26,19 @@ CREATE TABLE IF NOT EXISTS `albums` (
     `cover_picture` BYTES(MAX),
     `singer_id` INT64,
     CONSTRAINT `fk_singers_albums` FOREIGN KEY (`singer_id`) REFERENCES `singers`(`id`)
-) PRIMARY KEY (`id`);
+) PRIMARY KEY (`album_id`);
 
 CREATE SEQUENCE IF NOT EXISTS `tracks_seq` OPTIONS (sequence_kind = "bit_reversed_positive");
 
 CREATE TABLE IF NOT EXISTS `tracks` (
-    `id` INT64,
+    `album_id` INT64,
     `track_number` INT64,
     `created_at` TIMESTAMP,
     `updated_at` TIMESTAMP,
     `deleted_at` TIMESTAMP,
     `title` STRING(MAX),
     `sample_rate` FLOAT64,
-) PRIMARY KEY (`id`,`track_number`), INTERLEAVE IN PARENT albums ON DELETE CASCADE;
+) PRIMARY KEY (`album_id`,`track_number`), INTERLEAVE IN PARENT albums ON DELETE CASCADE;
 
 CREATE SEQUENCE IF NOT EXISTS `venues_seq` OPTIONS (sequence_kind = "bit_reversed_positive");
 
@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS `performances` (
     `start_time`        TIMESTAMP,
     `rating`           FLOAT64,
     CONSTRAINT `fk_performances_concerts` FOREIGN KEY (`concert_id`) REFERENCES `concerts` (`id`),
-    CONSTRAINT `fk_performances_tracks` FOREIGN KEY (`album_id`, `track_number`) REFERENCES `tracks` (`id`, `track_number`),
+    CONSTRAINT `fk_performances_tracks` FOREIGN KEY (`album_id`, `track_number`) REFERENCES `tracks` (`album_id`, `track_number`),
 ) PRIMARY KEY (`id`);
 
 CREATE SEQUENCE IF NOT EXISTS `ticket_sales_seq` OPTIONS (

@@ -24,10 +24,10 @@ import (
 	"gorm.io/gorm"
 )
 
-// InsertData shows how to insert data into Spanner in batches when using gorm.
-// Batching inserts reduces the number of round-trips to Spanner.
+// InsertData shows how to insert data into Spanner in one round-trip when using gorm.
+// Creating records in one call to Create reduces the number of round-trips to Spanner.
 //
-// Execute the sample with the command `go run run_sample.go hello_world` from this directory.
+// Execute the sample with the command `go run run_sample.go insert_data` from this directory.
 func InsertData(projectId, instanceId, databaseId string) error {
 	db, err := gorm.Open(spannergorm.New(spannergorm.Config{
 		DriverName: "spanner",

@@ -19,25 +19,34 @@ type Singer struct {
 }
 
 type Album struct {
-	gorm.Model
+	// Album does not embed gorm.Model, but instead manually adds the same fields here.
+	// This allows us to use a custom name for the ID field, which again makes it easier
+	// to define Track as INTERLEAVE IN PARENT Album.
+	AlbumID         uint `gorm:"primarykey"`
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	DeletedAt       gorm.DeletedAt `gorm:"index"`
 	Title           string
 	MarketingBudget sql.NullFloat64
 	ReleaseDate     spanner.NullDate
 	CoverPicture    []byte
 	SingerId        int64
 	Singer          Singer
-	Tracks          []Track `gorm:"foreignKey:id"`
+	Tracks          []Track
 }
 
 // Track is interleaved in Album. The ID column is both the first part of the
 // primary key of Track, and a reference to the Album that owns the Track.
 type Track struct {
-	gorm.Model
+	AlbumID uint `gorm:"primarykey"`
 	// Mark TrackNumber as part of the primary key. It is not an auto-incremented value.
 	TrackNumber int64 `gorm:"primaryKey;autoIncrement:false"`
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	DeletedAt   gorm.DeletedAt `gorm:"index"`
 	Title       string
 	SampleRate  float64
-	Album       Album `gorm:"foreignKey:id"`
+	Album       Album
 }
 
 type Venue struct {

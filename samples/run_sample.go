@@ -52,6 +52,8 @@ func main() {
 		emulator.RunSampleOnEmulator(snippets.HelloWorld, ddlStatements...)
 	case "insert_data":
 		emulator.RunSampleOnEmulator(snippets.InsertData, ddlStatements...)
+	case "batch_insert":
+		emulator.RunSampleOnEmulator(snippets.CreateInBatches, ddlStatements...)
 	case "auto_save_associations":
 		emulator.RunSampleOnEmulator(snippets.AutoSaveAssociations, ddlStatements...)
 	case "interleaved_tables":
@@ -64,6 +66,10 @@ func main() {
 		emulator.RunSampleOnEmulator(snippets.AbortedTransaction, ddlStatements...)
 	case "migrations":
 		emulator.RunSampleOnEmulator(snippets.Migrations)
+	case "client_library":
+		emulator.RunSampleOnEmulator(snippets.ClientLibrary, ddlStatements...)
+	case "uuid_primary_key":
+		emulator.RunSampleOnEmulator(snippets.UuidPrimaryKey)
 	default:
 		fmt.Printf("unknown sample: %s\n", sample)
 		os.Exit(1)

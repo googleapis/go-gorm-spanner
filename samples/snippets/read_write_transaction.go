@@ -64,6 +64,10 @@ func ReadWriteTransaction(projectId, instanceId, databaseId string) error {
 		// Whenever possible, only select the columns and rows that you actually
 		// need in a read/write transaction to prevent taking more locks than
 		// necessary.
+		// Include the query in the read/write transaction to guarantee the consistency
+		// of the data during the entire duration of the transaction. If this query was
+		// executed outside of this transaction, then there would be no guarantee that
+		// no other transaction has updated it by the time that this transaction commits.
 		var venues []*sample_model.Venue
 		if err := tx.Select("id", "venue_details").Where("venue_details is null").Find(&venues).Error; err != nil {
 			return err
