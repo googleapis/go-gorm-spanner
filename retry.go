@@ -17,9 +17,12 @@ package gorm
 import (
 	"context"
 	"database/sql"
+	"math/rand"
+	"time"
 
 	"cloud.google.com/go/spanner"
 	"github.com/googleapis/gax-go/v2"
+	spannerdriver "github.com/googleapis/go-sql-spanner"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
@@ -28,8 +31,15 @@ import (
 // RunTransaction executes a transaction on Spanner using the given
 // gorm database, and retries the transaction if it is aborted by Spanner.
 func RunTransaction(ctx context.Context, db *gorm.DB, fc func(tx *gorm.DB) error, opts ...*sql.TxOptions) error {
+	// Disable internal (checksum-based) retries on the Spanner database/SQL connection.
+	var opt *sql.TxOptions
+	// Note: gorm also only uses the first option, so it is safe to pick just the first element in the slice.
+	if len(opts) > 0 {
+		opt = opts[0]
+	}
+	opt.Isolation = spannerdriver.WithDisableRetryAborts(opt.Isolation)
 	for {
-		err := db.Transaction(fc, opts...)
+		err := db.Transaction(fc, opt)
 		if err == nil {
 			return nil
 		}
@@ -38,10 +48,13 @@ func RunTransaction(ctx context.Context, db *gorm.DB, fc func(tx *gorm.DB) error
 			return err
 		}
 		delay, ok := spanner.ExtractRetryDelay(err)
-		if ok {
-			if err := gax.Sleep(ctx, delay); err != nil {
-				return err
-			}
+		if !ok {
+			// Use a random backoff time if no backoff time was included in the error.
+			r := rand.New(rand.NewSource(time.Now().UnixNano()))
+			delay = time.Duration(r.Intn(20)) * time.Millisecond
+		}
+		if err := gax.Sleep(ctx, delay); err != nil {
+			return err
 		}
 	}
 }

@@ -16,10 +16,13 @@ package gorm
 
 import (
 	"context"
+	"database/sql"
+	"fmt"
 	"log"
 	"os"
 	"reflect"
 	"regexp"
+	"sync"
 	"testing"
 	"time"
 
@@ -348,5 +351,66 @@ func TestIntegration_CommitTimestamp(t *testing.T) {
 	}
 	if !singer.LastUpdated.Timestamp.Valid {
 		t.Fatalf("missing commit timestamp for singer")
+	}
+}
+
+func TestIntegration_RunTransaction(t *testing.T) {
+	skipIfShort(t)
+	t.Parallel()
+
+	ctx := context.Background()
+	dsn, cleanup, err := testutil.CreateTestDB(ctx)
+	if err != nil {
+		log.Fatalf("could not init integration tests while creating database: %v", err)
+	}
+	defer cleanup()
+	// Open db.
+	db, err := gorm.Open(New(Config{
+		DriverName: "spanner",
+		DSN:        dsn,
+	}), &gorm.Config{PrepareStmt: true})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	type Number struct {
+		Id   int64
+		Name string
+	}
+
+	if err := db.AutoMigrate(&Number{}); err != nil {
+		t.Fatalf("failed to migrate: %v", err)
+	}
+
+	numTransactions := 20
+	wg := &sync.WaitGroup{}
+	wg.Add(numTransactions)
+	var countBefore int
+	if err := db.Raw("select count(1) from numbers").Scan(&countBefore).Error; err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < numTransactions; i++ {
+		go func() {
+			defer wg.Done()
+			_ = RunTransaction(ctx, db, func(tx *gorm.DB) error {
+				var max int64
+				if err := tx.Raw("select coalesce(max(id), 0) from numbers").Scan(&max).Error; err != nil {
+					return err
+				}
+				number := Number{Id: max + 1, Name: fmt.Sprintf("Number: %d", max+1)}
+				if err := tx.Create(&number).Error; err != nil {
+					return err
+				}
+				return nil
+			}, &sql.TxOptions{})
+		}()
+	}
+	wg.Wait()
+	var countAfter int
+	if err := db.Raw("select count(1) from numbers").Scan(&countAfter).Error; err != nil {
+		t.Fatal(err)
+	}
+	if g, w := countAfter-countBefore, numTransactions; g != w {
+		t.Fatalf("number count mismatch:\n Got: %v\nWant: %v", g, w)
 	}
 }
