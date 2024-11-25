@@ -5,14 +5,14 @@ go 1.22.7
 toolchain go1.23.3
 
 require (
-	cloud.google.com/go/longrunning v0.6.2
+	cloud.google.com/go/longrunning v0.6.3
 	cloud.google.com/go/spanner v1.73.0
 	github.com/golang/protobuf v1.5.4
 	github.com/google/go-cmp v0.6.0
-	github.com/googleapis/go-sql-spanner v1.8.0
+	github.com/googleapis/go-sql-spanner v1.9.0
 	github.com/shopspring/decimal v1.4.0
-	github.com/stretchr/testify v1.9.0
-	google.golang.org/api v0.206.0
+	github.com/stretchr/testify v1.10.0
+	google.golang.org/api v0.209.0
 	google.golang.org/grpc v1.68.0
 	google.golang.org/protobuf v1.35.2
 	gorm.io/datatypes v1.2.4
@@ -67,7 +67,7 @@ require (
 	golang.org/x/time v0.8.0 // indirect
 	google.golang.org/genproto v0.0.0-20241113202542-65e8d215514f // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20241104194629-dd2ea8efbc28 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20241113202542-65e8d215514f // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20241118233622-e639e219e697 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gorm.io/driver/mysql v1.5.6 // indirect
 )
