@@ -10,8 +10,8 @@ require (
 	cloud.google.com/go/spanner v1.73.0
 	github.com/google/uuid v1.6.0
 	github.com/googleapis/go-gorm-spanner v1.4.0
-	github.com/googleapis/go-sql-spanner v1.8.0
-	google.golang.org/genproto v0.0.0-20241113202542-65e8d215514f
+	github.com/googleapis/go-sql-spanner v1.9.0
+	google.golang.org/genproto e639e219e697
 	google.golang.org/grpc v1.68.0
 	gorm.io/datatypes v1.2.4
 	gorm.io/gorm v1.25.12
