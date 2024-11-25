@@ -245,7 +245,7 @@ func TestRunTransaction(t *testing.T) {
 			return err
 		}
 		return nil
-	}, &sql.TxOptions{}); err != nil {
+	}); err != nil {
 		t.Fatal(err)
 	}
 	// Verify that the insert was only executed once.
@@ -279,6 +279,20 @@ func TestRunTransaction(t *testing.T) {
 	insertReqs = filter(execReqs, insertSql)
 	if g, w := len(insertReqs), 2; g != w {
 		t.Fatalf("num requests mismatch\n Got: %v\nWant: %v", g, w)
+	}
+}
+
+func TestRunTransactionWithNilAsOptions(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	db, _, teardown := setupTestGormConnection(t)
+	defer teardown()
+
+	if err := RunTransaction(ctx, db, func(tx *gorm.DB) error {
+		return nil
+	}, nil); err != nil {
+		t.Fatal(err)
 	}
 }
 
