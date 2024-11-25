@@ -52,8 +52,14 @@ func main() {
 		emulator.RunSampleOnEmulator(snippets.HelloWorld, ddlStatements...)
 	case "insert_data":
 		emulator.RunSampleOnEmulator(snippets.InsertData, ddlStatements...)
+	case "upsert":
+		emulator.RunSampleOnEmulator(snippets.Upsert, ddlStatements...)
 	case "batch_insert":
 		emulator.RunSampleOnEmulator(snippets.CreateInBatches, ddlStatements...)
+	case "find_in_batches":
+		emulator.RunSampleOnEmulator(snippets.FindInBatches, ddlStatements...)
+	case "batch_dml":
+		emulator.RunSampleOnEmulator(snippets.BatchDml, ddlStatements...)
 	case "auto_save_associations":
 		emulator.RunSampleOnEmulator(snippets.AutoSaveAssociations, ddlStatements...)
 	case "interleaved_tables":
@@ -70,6 +76,8 @@ func main() {
 		emulator.RunSampleOnEmulator(snippets.ClientLibrary, ddlStatements...)
 	case "uuid_primary_key":
 		emulator.RunSampleOnEmulator(snippets.UuidPrimaryKey)
+	case "bit_reversed_sequence":
+		emulator.RunSampleOnEmulator(snippets.BitReversedSequence)
 	default:
 		fmt.Printf("unknown sample: %s\n", sample)
 		os.Exit(1)
