@@ -260,7 +260,9 @@ func TestRunTransaction(t *testing.T) {
 	server.TestSpanner.PutExecutionTime(testutil.MethodCommitTransaction, testutil.SimulatedExecutionTime{
 		Errors: []error{status.Error(codes.Aborted, "Aborted")},
 	})
+	attempts := 0
 	if err := RunTransaction(ctx, db, func(tx *gorm.DB) error {
+		attempts++
 		if err := tx.Create(&s).Error; err != nil {
 			return err
 		}
@@ -268,7 +270,10 @@ func TestRunTransaction(t *testing.T) {
 	}, &sql.TxOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	// Now verify that the insert was executed twice.
+	// Now verify that the insert was executed twice and that the function was called twice.
+	if g, w := attempts, 2; g != w {
+		t.Fatalf("attempts mismatch\n Got: %v\nWant: %v", g, w)
+	}
 	reqs = drainRequestsFromServer(server.TestSpanner)
 	execReqs = requestsOfType(reqs, reflect.TypeOf(&spannerpb.ExecuteSqlRequest{}))
 	insertReqs = filter(execReqs, insertSql)

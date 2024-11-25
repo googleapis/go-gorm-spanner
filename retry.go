@@ -22,6 +22,7 @@ import (
 
 	"cloud.google.com/go/spanner"
 	"github.com/googleapis/gax-go/v2"
+	spannerdriver "github.com/googleapis/go-sql-spanner"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
@@ -30,8 +31,15 @@ import (
 // RunTransaction executes a transaction on Spanner using the given
 // gorm database, and retries the transaction if it is aborted by Spanner.
 func RunTransaction(ctx context.Context, db *gorm.DB, fc func(tx *gorm.DB) error, opts ...*sql.TxOptions) error {
+	// Disable internal (checksum-based) retries on the Spanner database/SQL connection.
+	var opt *sql.TxOptions
+	// Note: gorm also only uses the first option, so it is safe to pick just the first element in the slice.
+	if len(opts) > 0 {
+		opt = opts[0]
+	}
+	opt.Isolation = spannerdriver.WithDisableRetryAborts(opt.Isolation)
 	for {
-		err := db.Transaction(fc, opts...)
+		err := db.Transaction(fc, opt)
 		if err == nil {
 			return nil
 		}
