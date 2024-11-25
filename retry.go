@@ -33,7 +33,7 @@ import (
 func RunTransaction(ctx context.Context, db *gorm.DB, fc func(tx *gorm.DB) error, opts ...*sql.TxOptions) error {
 	// Disable internal (checksum-based) retries on the Spanner database/SQL connection.
 	// Note: gorm also only uses the first option, so it is safe to pick just the first element in the slice.
-	if len(opts) > 0 {
+	if len(opts) > 0 && opts[0] != nil {
 		opts[0].Isolation = spannerdriver.WithDisableRetryAborts(opts[0].Isolation)
 	}
 	for {
