@@ -45,7 +45,7 @@ var containerId string
 // 4. Stop the Docker container with the emulator.
 func RunSampleOnEmulator(sample func(string, string, string) error, ddlStatements ...string) {
 	var err error
-	if err = startEmulator(); err != nil {
+	if _, _, err = startEmulator(); err != nil {
 		log.Fatalf("failed to start emulator: %v", err)
 	}
 	projectId, instanceId, databaseId := "my-project", "my-instance", "my-database"
@@ -64,42 +64,39 @@ func RunSampleOnEmulator(sample func(string, string, string) error, ddlStatement
 	}
 }
 
-func startEmulator() error {
+func startEmulator() (host, port string, err error) {
 	ctx := context.Background()
-	if err := os.Setenv("SPANNER_EMULATOR_HOST", "localhost:9010"); err != nil {
-		return err
-	}
 
 	// Initialize a Docker client.
-	var err error
 	cli, err = client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
-		return err
+		return "", "", err
 	}
 	// Pull the Spanner Emulator docker image.
 	reader, err := cli.ImagePull(ctx, "gcr.io/cloud-spanner-emulator/emulator", image.PullOptions{})
 	if err != nil {
-		return err
+		return "", "", err
 	}
 	defer func() { _ = reader.Close() }()
 	// cli.ImagePull is asynchronous.
 	// The reader needs to be read completely for the pull operation to complete.
 	if _, err := io.Copy(io.Discard, reader); err != nil {
-		return err
+		return "", "", err
 	}
 	// Create and start a container with the emulator.
 	resp, err := cli.ContainerCreate(ctx, &container.Config{
 		Image:        "gcr.io/cloud-spanner-emulator/emulator",
 		ExposedPorts: nat.PortSet{"9010": {}},
 	}, &container.HostConfig{
-		PortBindings: map[nat.Port][]nat.PortBinding{"9010": {{HostIP: "0.0.0.0", HostPort: "9010"}}},
+		AutoRemove:   true,
+		PortBindings: map[nat.Port][]nat.PortBinding{"9010": {{HostIP: "0.0.0.0", HostPort: ""}}},
 	}, nil, nil, "")
 	if err != nil {
-		return err
+		return "", "", err
 	}
 	containerId = resp.ID
 	if err := cli.ContainerStart(ctx, containerId, container.StartOptions{}); err != nil {
-		return err
+		return "", "", err
 	}
 	// Wait max 10 seconds or until the emulator is running.
 	for c := 0; c < 20; c++ {
@@ -108,14 +105,21 @@ func startEmulator() error {
 		<-time.After(500 * time.Millisecond)
 		resp, err := cli.ContainerInspect(ctx, containerId)
 		if err != nil {
-			return fmt.Errorf("failed to inspect container state: %v", err)
+			return "", "", fmt.Errorf("failed to inspect container state: %v", err)
 		}
 		if resp.State.Running {
+			host = resp.NetworkSettings.Ports["9010/tcp"][0].HostIP
+			port = resp.NetworkSettings.Ports["9010/tcp"][0].HostPort
 			break
 		}
 	}
-
-	return nil
+	if host == "" || port == "" {
+		return "", "", fmt.Errorf("emulator did not start successfully")
+	}
+	if err := os.Setenv("SPANNER_EMULATOR_HOST", fmt.Sprintf("%s:%s", host, port)); err != nil {
+		return "", "", err
+	}
+	return
 }
 
 func createInstance(projectId, instanceId string) error {
