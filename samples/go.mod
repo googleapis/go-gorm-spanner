@@ -5,6 +5,7 @@ go 1.22.7
 toolchain go1.23.3
 
 replace github.com/googleapis/go-gorm-spanner => ../
+replace github.com/googleapis/go-sql-spanner => /Users/loite/GolandProjects/go-sql-spanner
 
 require (
 	cloud.google.com/go v0.116.0

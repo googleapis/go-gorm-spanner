@@ -21,9 +21,11 @@ import (
 	"strconv"
 	"testing"
 
+	"cloud.google.com/go/spanner"
 	"cloud.google.com/go/spanner/apiv1/spannerpb"
 	structpb "github.com/golang/protobuf/ptypes/struct"
 	"github.com/googleapis/go-sql-spanner/testutil"
+	"google.golang.org/api/option"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
@@ -293,6 +295,36 @@ func TestRunTransactionWithNilAsOptions(t *testing.T) {
 		return nil
 	}, nil); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestCustomSpannerConfig(t *testing.T) {
+	t.Parallel()
+
+	config := func(config *spanner.ClientConfig, opts *[]option.ClientOption) {
+		config.QueryOptions = spanner.QueryOptions{Options: &spannerpb.ExecuteSqlRequest_QueryOptions{OptimizerVersion: "1"}}
+	}
+	db, server, teardown := setupTestGormConnectionWithCustomConfig(t, config)
+	defer teardown()
+
+	s := singerWithCommitTimestamp{
+		FirstName: "First",
+		LastName:  "Last",
+	}
+	insertSql := "INSERT INTO `singers` (`first_name`,`last_name`,`last_updated`,`rating`) VALUES (@p1,@p2,PENDING_COMMIT_TIMESTAMP(),@p3) THEN RETURN `id`"
+	_ = putSingerResult(server, insertSql, s)
+	if err := db.Create(&s).Error; err != nil {
+		t.Fatalf("failed to create singer: %v", err)
+	}
+
+	reqs := drainRequestsFromServer(server.TestSpanner)
+	execReqs := requestsOfType(reqs, reflect.TypeOf(&spannerpb.ExecuteSqlRequest{}))
+	insertReqs := filter(execReqs, insertSql)
+	if g, w := len(insertReqs), 1; g != w {
+		t.Fatalf("num requests mismatch\n Got: %v\nWant: %v", g, w)
+	}
+	if g, w := insertReqs[0].QueryOptions.OptimizerVersion, "1"; g != w {
+		t.Fatalf("optimizer version mismatch\n Got: %v\nWant: %v", g, w)
 	}
 }
 

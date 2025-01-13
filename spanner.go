@@ -17,6 +17,7 @@ package gorm
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"fmt"
 
 	"gorm.io/gorm"
@@ -31,8 +32,20 @@ import (
 
 type Config struct {
 	DriverName string
-	DSN        string
-	Conn       gorm.ConnPool
+
+	// DSN is the Data Source Name that should be used to open a database connection.
+	// Only set one of DSN, Connector, and Conn.
+	DSN string
+
+	// Connector is the driver.Connector that should be used to open a database connection.
+	// Create a driver.Connector for Spanner by calling spannerdriver.CreateConnector.
+	// A connector should be created only once and used to create all database connections.
+	// Only set one of DSN, Connector, and Conn.
+	Connector driver.Connector
+
+	// Conn is a pre-created gorm connection pool.
+	// Only set one of DSN, Connector, and Conn.
+	Conn gorm.ConnPool
 
 	// DisableAutoMigrateBatching turns off DDL batching for AutoMigrate calls.
 	// Cloud Spanner by default uses DDL batching when AutoMigrate is called, as
@@ -60,6 +73,14 @@ func (dialector Dialector) Name() string {
 }
 
 func (dialector Dialector) Initialize(db *gorm.DB) (err error) {
+	// Verify configuration.
+	if dialector.Connector != nil && dialector.Conn != nil {
+		return fmt.Errorf("only set one of Connector and Conn in the configuration")
+	}
+	if dialector.Connector != nil && dialector.DSN != "" {
+		return fmt.Errorf("only set one of Connector and DSN in the configuration")
+	}
+
 	callbacks.RegisterDefaultCallbacks(db, &callbacks.Config{
 		CreateClauses: []string{"INSERT", "VALUES", "RETURNING"},
 	})
@@ -78,6 +99,8 @@ func (dialector Dialector) Initialize(db *gorm.DB) (err error) {
 
 	if dialector.Conn != nil {
 		db.ConnPool = dialector.Conn
+	} else if dialector.Connector != nil {
+		db.ConnPool = sql.OpenDB(dialector.Connector)
 	} else {
 		db.ConnPool, err = sql.Open(dialector.DriverName, dialector.DSN)
 		if err != nil {

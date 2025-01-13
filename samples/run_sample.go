@@ -78,6 +78,8 @@ func main() {
 		emulator.RunSampleOnEmulator(snippets.UuidPrimaryKey)
 	case "bit_reversed_sequence":
 		emulator.RunSampleOnEmulator(snippets.BitReversedSequence)
+	case "custom_spanner_config":
+		emulator.RunSampleOnEmulator(snippets.CustomSpannerConfig)
 	default:
 		fmt.Printf("unknown sample: %s\n", sample)
 		os.Exit(1)
