@@ -414,3 +414,59 @@ func TestIntegration_RunTransaction(t *testing.T) {
 		t.Fatalf("number count mismatch:\n Got: %v\nWant: %v", g, w)
 	}
 }
+
+func TestIntegration_ForeignKeyMigrateMultipleTimes(t *testing.T) {
+	skipIfShort(t)
+	t.Parallel()
+	dsn, cleanup, err := testutil.CreateTestDB(context.Background())
+	if err != nil {
+		log.Fatalf("could not init integration tests while creating database: %v", err)
+	}
+	defer cleanup()
+	// Open db.
+	db, err := gorm.Open(New(Config{
+		DriverName: "spanner",
+		DSN:        dsn,
+	}), &gorm.Config{PrepareStmt: true})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// An unrelated struct that has a SHA256 field.
+	type unrelated struct {
+		gorm.Model
+		SHA256 string
+	}
+
+	// a and b are in a foreign key relationship.
+	type b struct {
+		gorm.Model
+		ForeignSHA256 string
+	}
+
+	// a also has a SHA256 field, but it is unique.
+	type a struct {
+		gorm.Model
+		SHA256 string `gorm:"uniqueIndex"`
+		bs     []*b   `gorm:"foreignKey:ForeignSHA256;references:SHA256"`
+	}
+
+	if err := db.AutoMigrate(&unrelated{}, &a{}, &b{}); err != nil {
+		t.Fatalf("Failed first migrate, got error: %v", err)
+	}
+
+	// Ensure the unrelated table is to migrate a second time.
+	// Prior to the bug fix accompanying this test, the unrelated table would
+	// fail to be migrated with this error:
+	// `uni_unrelateds_sha256 is not a constraint in unrelateds`
+	// The migrator was trying to drop the unique constraint on the SHA256 field
+	// of the unrelated table, which doesn't exist. The was happening because the
+	// get column details query was crossing table boundaries and misattributing
+	// the uniqueness of the SHA256 column, with the a table.
+	if err := db.AutoMigrate(&unrelated{}); err != nil {
+		t.Fatalf("Failed second migrate, got error: %v", err)
+	}
+
+	// Use the bs field to silence the unused field warning.
+	_ = a{bs: []*b{{}}}
+}
