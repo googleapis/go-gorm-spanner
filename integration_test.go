@@ -455,14 +455,14 @@ func TestIntegration_ForeignKeyMigrateMultipleTimes(t *testing.T) {
 		t.Fatalf("Failed first migrate, got error: %v", err)
 	}
 
-	// Ensure the unrelated table is to migrate a second time.
-	// Prior to the bug fix accompanying this test, the unrelated table would
+	// Ensure the `unrelated` table is able to migrate a second time.
+	// Prior to the bug fix accompanying this test, the `unrelated` table would
 	// fail to be migrated with this error:
 	// `uni_unrelateds_sha256 is not a constraint in unrelateds`
 	// The migrator was trying to drop the unique constraint on the SHA256 field
-	// of the unrelated table, which doesn't exist. The was happening because the
-	// get column details query was crossing table boundaries and misattributing
-	// the uniqueness of the SHA256 column, with the a table.
+	// of the `unrelated`` table, which doesn't exist. This was happening because
+	// the get column details query was crossing table boundaries and
+	// misattributing the uniqueness of the SHA256 column, with the `a`` table.
 	if err := db.AutoMigrate(&unrelated{}); err != nil {
 		t.Fatalf("Failed second migrate, got error: %v", err)
 	}
