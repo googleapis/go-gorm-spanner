@@ -415,7 +415,7 @@ func TestIntegration_RunTransaction(t *testing.T) {
 	}
 }
 
-func TestIntegration_ForeignKeyMigrateMultipleTimes(t *testing.T) {
+func TestIntegration_MigrateMultipleTimesUniqueField(t *testing.T) {
 	skipIfShort(t)
 	t.Parallel()
 	dsn, cleanup, err := testutil.CreateTestDB(context.Background())
@@ -432,41 +432,31 @@ func TestIntegration_ForeignKeyMigrateMultipleTimes(t *testing.T) {
 		log.Fatal(err)
 	}
 
-	// An unrelated struct that has a SHA256 field.
-	type unrelated struct {
+	// A struct that has a SHA256 field.
+	type As struct {
 		gorm.Model
 		SHA256 string
 	}
 
-	// a and b are in a foreign key relationship.
-	type b struct {
-		gorm.Model
-		ForeignSHA256 string
-	}
-
-	// a also has a SHA256 field, but it is unique.
-	type a struct {
+	// Another struct with a SHA256 field, but it is unique.
+	type Bs struct {
 		gorm.Model
 		SHA256 string `gorm:"uniqueIndex"`
-		bs     []*b   `gorm:"foreignKey:ForeignSHA256;references:SHA256"`
 	}
 
-	if err := db.AutoMigrate(&unrelated{}, &a{}, &b{}); err != nil {
+	if err := db.AutoMigrate(&As{}, &Bs{}); err != nil {
 		t.Fatalf("Failed first migrate, got error: %v", err)
 	}
 
-	// Ensure the `unrelated` table is able to migrate a second time.
-	// Prior to the bug fix accompanying this test, the `unrelated` table would
-	// fail to be migrated with this error:
-	// `uni_unrelateds_sha256 is not a constraint in unrelateds`
+	// Ensure the `as` table is able to migrate a second time.
+	// Prior to the bug fix accompanying this test, the `as` table would fail to
+	// be migrated with this error:
+	// `NotFound desc = uni_as_sha256 is not a constraint in as`
 	// The migrator was trying to drop the unique constraint on the SHA256 field
-	// of the `unrelated`` table, which doesn't exist. This was happening because
-	// the get column details query was crossing table boundaries and
-	// misattributing the uniqueness of the SHA256 column, with the `a`` table.
-	if err := db.AutoMigrate(&unrelated{}); err != nil {
+	// of the `as` table, which doesn't exist. This was happening because the
+	// get column details query was crossing table boundaries and misattributing
+	// the uniqueness of the SHA256 column, with the `as` table.
+	if err := db.AutoMigrate(&As{}); err != nil {
 		t.Fatalf("Failed second migrate, got error: %v", err)
 	}
-
-	// Use the bs field to silence the unused field warning.
-	_ = a{bs: []*b{{}}}
 }
