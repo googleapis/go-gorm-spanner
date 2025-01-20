@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.5.0](https://github.com/googleapis/go-gorm-spanner/compare/v1.4.0...v1.5.0) (2025-01-20)
+
+
+### Features
+
+* Add sample code snippets for common Spanner and gorm features ([#123](https://github.com/googleapis/go-gorm-spanner/issues/123)) ([8ff4040](https://github.com/googleapis/go-gorm-spanner/commit/8ff4040de016d9e03bef66b439371ee2f45ee986))
+* Add transaction runner ([#127](https://github.com/googleapis/go-gorm-spanner/issues/127)) ([b446423](https://github.com/googleapis/go-gorm-spanner/commit/b446423dfb01e1c4bc76a59a3bf98a445b899465))
+* Support dry-run mode for auto-migrate ([#124](https://github.com/googleapis/go-gorm-spanner/issues/124)) ([abc7c9b](https://github.com/googleapis/go-gorm-spanner/commit/abc7c9b340a2b3127ee8e8849bb4366bd1254f8d))
+
+
+### Bug Fixes
+
+* Avoid getting column details from other tables ([#137](https://github.com/googleapis/go-gorm-spanner/issues/137)) ([0aac7e5](https://github.com/googleapis/go-gorm-spanner/commit/0aac7e5daf311d9783b536dbffde93de6a47f67a))
+
 ## [1.4.0](https://github.com/googleapis/go-gorm-spanner/compare/v1.3.0...v1.4.0) (2024-10-21)
 
 
