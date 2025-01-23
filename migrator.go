@@ -524,3 +524,25 @@ func (c Column) DecimalSize() (int64, int64, bool) {
 	}
 	return 0, 0, false
 }
+
+func (m spannerMigrator) isUniqueConstraint(name string) bool {
+	// Get the unique name prefix from the naming strategy.
+	uniName := strings.TrimRight(m.DB.NamingStrategy.UniqueName("", ""), "_")
+	return strings.HasPrefix(name, uniName)
+}
+
+// Ignore requests to create unique constraints, as Spanner does not support them.
+func (m spannerMigrator) CreateConstraint(value interface{}, name string) error {
+	if m.isUniqueConstraint(name) {
+		return nil
+	}
+	return m.Migrator.CreateConstraint(value, name)
+}
+
+// Ignore requests to drop unique constraints, as Spanner does not support them.
+func (m spannerMigrator) DropConstraint(value interface{}, name string) error {
+	if m.isUniqueConstraint(name) {
+		return nil
+	}
+	return m.Migrator.DropConstraint(value, name)
+}

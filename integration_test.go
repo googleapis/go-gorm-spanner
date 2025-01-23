@@ -415,7 +415,7 @@ func TestIntegration_RunTransaction(t *testing.T) {
 	}
 }
 
-func TestIntegration_MigrateMultipleTimesUniqueField(t *testing.T) {
+func TestIntegration_MigrateMultipleTimesUniqueIndexSameFieldName(t *testing.T) {
 	skipIfShort(t)
 	t.Parallel()
 	dsn, cleanup, err := testutil.CreateTestDB(context.Background())
@@ -456,6 +456,70 @@ func TestIntegration_MigrateMultipleTimesUniqueField(t *testing.T) {
 	// of the `as` table, which doesn't exist. This was happening because the
 	// get column details query was crossing table boundaries and misattributing
 	// the uniqueness of the SHA256 column, with the `as` table.
+	if err := db.AutoMigrate(&As{}); err != nil {
+		t.Fatalf("Failed second migrate, got error: %v", err)
+	}
+}
+
+func TestIntegration_MigrateMultipleTimesUniqueIndex(t *testing.T) {
+	skipIfShort(t)
+	t.Parallel()
+	dsn, cleanup, err := testutil.CreateTestDB(context.Background())
+	if err != nil {
+		log.Fatalf("could not init integration tests while creating database: %v", err)
+	}
+	defer cleanup()
+	// Open db.
+	db, err := gorm.Open(New(Config{
+		DriverName: "spanner",
+		DSN:        dsn,
+	}), &gorm.Config{PrepareStmt: true})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// A struct that has a unique index.
+	type As struct {
+		gorm.Model
+		SHA256 string `gorm:"uniqueIndex"`
+	}
+
+	if err := db.AutoMigrate(&As{}); err != nil {
+		t.Fatalf("Failed first migrate, got error: %v", err)
+	}
+
+	if err := db.AutoMigrate(&As{}); err != nil {
+		t.Fatalf("Failed second migrate, got error: %v", err)
+	}
+}
+
+func TestIntegration_MigrateMultipleTimesUniqueField(t *testing.T) {
+	skipIfShort(t)
+	t.Parallel()
+	dsn, cleanup, err := testutil.CreateTestDB(context.Background())
+	if err != nil {
+		log.Fatalf("could not init integration tests while creating database: %v", err)
+	}
+	defer cleanup()
+	// Open db.
+	db, err := gorm.Open(New(Config{
+		DriverName: "spanner",
+		DSN:        dsn,
+	}), &gorm.Config{PrepareStmt: true})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// A struct that has a unique field.
+	type As struct {
+		gorm.Model
+		SHA256 string `gorm:"unique"`
+	}
+
+	if err := db.AutoMigrate(&As{}); err != nil {
+		t.Fatalf("Failed first migrate, got error: %v", err)
+	}
+
 	if err := db.AutoMigrate(&As{}); err != nil {
 		t.Fatalf("Failed second migrate, got error: %v", err)
 	}
