@@ -9,10 +9,10 @@ replace github.com/googleapis/go-gorm-spanner => ../
 require (
 	cloud.google.com/go/spanner v1.73.0
 	github.com/google/uuid v1.6.0
-	github.com/googleapis/go-gorm-spanner v1.4.0
-	github.com/googleapis/go-sql-spanner v1.9.0
-	google.golang.org/genproto v0.0.0-20250115164207-1a7da9e5054f
-	google.golang.org/grpc v1.69.4
+	github.com/googleapis/go-gorm-spanner v1.5.0
+	github.com/googleapis/go-sql-spanner v1.10.0
+	google.golang.org/genproto 29210b9bc287
+	google.golang.org/grpc v1.70.0
 	gorm.io/datatypes v1.2.5
 	gorm.io/gorm v1.25.12
 )
