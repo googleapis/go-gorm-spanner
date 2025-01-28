@@ -427,7 +427,8 @@ func (m spannerMigrator) ColumnTypes(value interface{}) ([]gorm.ColumnType, erro
 			case "PRI":
 				column.PrimaryKeyValue = sql.NullBool{Bool: true, Valid: true}
 			case "UNI":
-				column.UniqueValue = sql.NullBool{Bool: true, Valid: true}
+				// A unique index should not cause the column to be considered unique.
+				column.UniqueValue = sql.NullBool{Bool: false, Valid: true}
 			}
 			column.DefaultValueValue.String = strings.Trim(column.DefaultValueValue.String, "'")
 

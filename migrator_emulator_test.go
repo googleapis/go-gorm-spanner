@@ -263,7 +263,7 @@ func verifyGetIndexes(t *testing.T, db *gorm.DB) {
 	}
 }
 
-func TestIntegration_MigrateMultipleTimesUniqueIndexSameFieldName(t *testing.T) {
+func TestMigrateMultipleTimesUniqueIndexSameFieldName(t *testing.T) {
 	skipIfShortOrNotEmulator(t)
 	t.Parallel()
 
@@ -310,7 +310,7 @@ func TestIntegration_MigrateMultipleTimesUniqueIndexSameFieldName(t *testing.T) 
 	}
 }
 
-func TestIntegration_MigrateMultipleTimesUniqueIndex(t *testing.T) {
+func TestMigrateMultipleTimesUniqueIndex(t *testing.T) {
 	skipIfShortOrNotEmulator(t)
 	t.Parallel()
 
@@ -343,7 +343,7 @@ func TestIntegration_MigrateMultipleTimesUniqueIndex(t *testing.T) {
 	}
 }
 
-func TestIntegration_MigrateUniqueFieldFails(t *testing.T) {
+func TestMigrateUniqueFieldFails(t *testing.T) {
 	skipIfShortOrNotEmulator(t)
 	t.Parallel()
 
