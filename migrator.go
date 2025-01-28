@@ -16,6 +16,7 @@ package gorm
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"slices"
 	"sort"
@@ -106,7 +107,7 @@ func (m spannerMigrator) autoMigrate(dryRun bool, values ...interface{}) ([]span
 			return nil, m.RunBatch()
 		}
 	}
-	return nil, fmt.Errorf("unexpected return value type: %v", err)
+	return nil, err
 }
 
 func (m spannerMigrator) StartBatchDDL() error {
@@ -216,6 +217,9 @@ func (m spannerMigrator) CreateTable(values ...interface{}) error {
 				}
 			}
 
+			if len(stmt.Schema.ParseUniqueConstraints()) > 0 {
+				return errUniqueConstraintNotSupported
+			}
 			for _, chk := range stmt.Schema.ParseCheckConstraints() {
 				createTableSQL += "CONSTRAINT ? CHECK (?),"
 				values = append(values, clause.Column{Name: chk.Name}, clause.Expr{SQL: chk.Constraint})
@@ -525,24 +529,36 @@ func (c Column) DecimalSize() (int64, int64, bool) {
 	return 0, 0, false
 }
 
-func (m spannerMigrator) isUniqueConstraint(name string) bool {
-	// Get the unique name prefix from the naming strategy.
-	uniName := strings.TrimRight(m.DB.NamingStrategy.UniqueName("", ""), "_")
-	return strings.HasPrefix(name, uniName)
+func (m spannerMigrator) isUniqueConstraint(value interface{}, name string) bool {
+	isUnique := false
+	if err := m.RunWithValue(value, func(stmt *gorm.Statement) error {
+		uniqueConstraints := stmt.Schema.ParseUniqueConstraints()
+		if _, ok := uniqueConstraints[name]; ok {
+			isUnique = true
+		}
+		return nil
+	}); err != nil {
+		return false
+	}
+	return isUnique
 }
 
-// Ignore requests to create unique constraints, as Spanner does not support them.
+var errUniqueConstraintNotSupported = errors.New("unique constraints are not supported by Spanner, use a unique index instead")
+
+// CreateConstraint ignores requests to create unique constraints, as Spanner
+// does not support them.
 func (m spannerMigrator) CreateConstraint(value interface{}, name string) error {
-	if m.isUniqueConstraint(name) {
-		return nil
+	if m.isUniqueConstraint(value, name) {
+		return errUniqueConstraintNotSupported
 	}
 	return m.Migrator.CreateConstraint(value, name)
 }
 
-// Ignore requests to drop unique constraints, as Spanner does not support them.
+// DropConstraint ignores requests to drop unique constraints, as Spanner
+// does not support them.
 func (m spannerMigrator) DropConstraint(value interface{}, name string) error {
-	if m.isUniqueConstraint(name) {
-		return nil
+	if m.isUniqueConstraint(value, name) {
+		return errUniqueConstraintNotSupported
 	}
 	return m.Migrator.DropConstraint(value, name)
 }

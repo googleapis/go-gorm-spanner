@@ -262,3 +262,116 @@ func verifyGetIndexes(t *testing.T, db *gorm.DB) {
 		t.Fatalf("concerts GetIndexes mismatch: %v", concertIndexes)
 	}
 }
+
+func TestIntegration_MigrateMultipleTimesUniqueIndexSameFieldName(t *testing.T) {
+	skipIfShortOrNotEmulator(t)
+	t.Parallel()
+
+	dsn, cleanup, err := testutil.CreateTestDB(context.Background())
+	if err != nil {
+		log.Fatalf("could not init integration tests while creating database: %v", err)
+	}
+	defer cleanup()
+	// Open db.
+	db, err := gorm.Open(New(Config{
+		DriverName: "spanner",
+		DSN:        dsn,
+	}), &gorm.Config{PrepareStmt: true})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// A struct that has a SHA256 field.
+	type As struct {
+		gorm.Model
+		SHA256 string
+	}
+
+	// Another struct with a SHA256 field, but it is unique.
+	type Bs struct {
+		gorm.Model
+		SHA256 string `gorm:"uniqueIndex"`
+	}
+
+	if err := db.AutoMigrate(&As{}, &Bs{}); err != nil {
+		t.Fatalf("Failed first migrate, got error: %v", err)
+	}
+
+	// Ensure the `as` table is able to migrate a second time.
+	// Prior to the bug fix accompanying this test, the `as` table would fail to
+	// be migrated with this error:
+	// `NotFound desc = uni_as_sha256 is not a constraint in as`
+	// The migrator was trying to drop the unique constraint on the SHA256 field
+	// of the `as` table, which doesn't exist. This was happening because the
+	// get column details query was crossing table boundaries and misattributing
+	// the uniqueness of the SHA256 column, with the `as` table.
+	if err := db.AutoMigrate(&As{}); err != nil {
+		t.Fatalf("Failed second migrate, got error: %v", err)
+	}
+}
+
+func TestIntegration_MigrateMultipleTimesUniqueIndex(t *testing.T) {
+	skipIfShortOrNotEmulator(t)
+	t.Parallel()
+
+	dsn, cleanup, err := testutil.CreateTestDB(context.Background())
+	if err != nil {
+		log.Fatalf("could not init integration tests while creating database: %v", err)
+	}
+	defer cleanup()
+	// Open db.
+	db, err := gorm.Open(New(Config{
+		DriverName: "spanner",
+		DSN:        dsn,
+	}), &gorm.Config{PrepareStmt: true})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// A struct that has a unique index.
+	type As struct {
+		gorm.Model
+		SHA256 string `gorm:"uniqueIndex"`
+	}
+
+	if err := db.AutoMigrate(&As{}); err != nil {
+		t.Fatalf("Failed first migrate, got error: %v", err)
+	}
+
+	if err := db.AutoMigrate(&As{}); err != nil {
+		t.Fatalf("Failed second migrate, got error: %v", err)
+	}
+}
+
+func TestIntegration_MigrateUniqueFieldFails(t *testing.T) {
+	skipIfShortOrNotEmulator(t)
+	t.Parallel()
+
+	dsn, cleanup, err := testutil.CreateTestDB(context.Background())
+	if err != nil {
+		log.Fatalf("could not init integration tests while creating database: %v", err)
+	}
+	defer cleanup()
+	// Open db.
+	db, err := gorm.Open(New(Config{
+		DriverName: "spanner",
+		DSN:        dsn,
+	}), &gorm.Config{PrepareStmt: true})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// A struct that has a unique field.
+	type As struct {
+		gorm.Model
+		SHA256 string `gorm:"unique"`
+	}
+
+	if g, w := db.AutoMigrate(&As{}), errUniqueConstraintNotSupported; g != w {
+		t.Fatalf("first migrate error mismatch\n Got: %v\nWant: %v", g, w)
+	}
+
+	if g, w := db.AutoMigrate(&As{}), errUniqueConstraintNotSupported; g != w {
+		t.Fatalf("second migrate error mismatch\n Got: %v\nWant: %v", g, w)
+	}
+}
