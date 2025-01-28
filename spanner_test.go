@@ -24,6 +24,7 @@ import (
 	"cloud.google.com/go/spanner"
 	"cloud.google.com/go/spanner/apiv1/spannerpb"
 	structpb "github.com/golang/protobuf/ptypes/struct"
+	spannerdriver "github.com/googleapis/go-sql-spanner"
 	"github.com/googleapis/go-sql-spanner/testutil"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc/codes"
@@ -301,8 +302,15 @@ func TestRunTransactionWithNilAsOptions(t *testing.T) {
 func TestCustomSpannerConfig(t *testing.T) {
 	t.Parallel()
 
-	config := func(config *spanner.ClientConfig, opts *[]option.ClientOption) {
+	configFunc := func(config *spanner.ClientConfig, opts *[]option.ClientOption) {
 		config.QueryOptions = spanner.QueryOptions{Options: &spannerpb.ExecuteSqlRequest_QueryOptions{OptimizerVersion: "1"}}
+	}
+	config := spannerdriver.ConnectorConfig{
+		Project:      "p",
+		Instance:     "i",
+		Database:     "d",
+		Params:       map[string]string{"useplaintext": "true"},
+		Configurator: configFunc,
 	}
 	db, server, teardown := setupTestGormConnectionWithCustomConfig(t, config)
 	defer teardown()

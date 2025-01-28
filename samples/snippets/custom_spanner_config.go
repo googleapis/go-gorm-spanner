@@ -32,15 +32,21 @@ import (
 //
 // Execute the sample with the command `go run run_sample.go custom_spanner_config` from this directory.
 func CustomSpannerConfig(projectId, instanceId, databaseId string) error {
-	dsn := fmt.Sprintf("projects/%s/instances/%s/databases/%s", projectId, instanceId, databaseId)
-
 	// Create a function that sets the Spanner client configuration for the database connection.
 	configureFunction := func(config *spanner.ClientConfig, opts *[]option.ClientOption) {
 		// Set a default query optimizer version that the client should use.
 		config.QueryOptions = spanner.QueryOptions{Options: &spannerpb.ExecuteSqlRequest_QueryOptions{OptimizerVersion: "1"}}
 	}
+
+	// Create a ConnectorConfig to use with the Spanner database/sql driver.
+	config := spannerdriver.ConnectorConfig{
+		Project:      projectId,
+		Instance:     instanceId,
+		Database:     databaseId,
+		Configurator: configureFunction,
+	}
 	// Create a Connector for Spanner. This Connector instance should be re-used for all gorm connections.
-	c, err := spannerdriver.CreateConnector(dsn, configureFunction)
+	c, err := spannerdriver.CreateConnector(config)
 
 	db, err := gorm.Open(
 		spannergorm.New(spannergorm.Config{Connector: c}),
