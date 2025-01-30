@@ -4,19 +4,24 @@ go 1.22.7
 
 toolchain go1.23.5
 
-replace github.com/googleapis/go-gorm-spanner => ../
+replace (
+	github.com/googleapis/go-gorm-spanner => ../
+	github.com/googleapis/go-sql-spanner => /Users/loite/GolandProjects/go-sql-spanner
+)
 
 require (
 	cloud.google.com/go v0.118.0
 	cloud.google.com/go/spanner v1.73.0
 	github.com/docker/docker v27.5.1+incompatible
 	github.com/docker/go-connections v0.5.0
+	github.com/golang/protobuf v1.5.4
 	github.com/google/uuid v1.6.0
 	github.com/googleapis/go-gorm-spanner v1.5.0
 	github.com/googleapis/go-sql-spanner v1.10.0
 	github.com/stretchr/testify v1.10.0
 	google.golang.org/api v0.218.0
 	google.golang.org/grpc v1.70.0
+	google.golang.org/protobuf v1.36.4
 	gorm.io/gorm v1.25.12
 )
 
@@ -78,7 +83,6 @@ require (
 	google.golang.org/genproto v0.0.0-20241118233622-e639e219e697 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20241209162323-e6fa225c2576 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250124145028-65684f501c47 // indirect
-	google.golang.org/protobuf v1.36.4 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gotest.tools/v3 v3.5.1 // indirect
 )

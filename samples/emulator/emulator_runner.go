@@ -43,7 +43,11 @@ var containerId string
 // 2. Create a sample instance and database on the emulator.
 // 3. Execute the sample function against the emulator.
 // 4. Stop the Docker container with the emulator.
-func RunSampleOnEmulator(sample func(string, string, string) error, ddlStatements ...string) {
+func RunSampleOnEmulator(sample func(string, string, string) error) {
+	RunSampleOnEmulatorWithDdl(sample, nil)
+}
+
+func RunSampleOnEmulatorWithDdl(sample func(string, string, string) error, protoDescriptors []byte, ddlStatements ...string) {
 	var err error
 	if _, _, err = startEmulator(); err != nil {
 		log.Fatalf("failed to start emulator: %v", err)
@@ -53,7 +57,7 @@ func RunSampleOnEmulator(sample func(string, string, string) error, ddlStatement
 		stopEmulator()
 		log.Fatalf("failed to create instance on emulator: %v", err)
 	}
-	if err = createSampleDB(projectId, instanceId, databaseId, ddlStatements...); err != nil {
+	if err = createSampleDB(projectId, instanceId, databaseId, protoDescriptors, ddlStatements...); err != nil {
 		stopEmulator()
 		log.Fatalf("failed to create database on emulator: %v", err)
 	}
@@ -148,7 +152,7 @@ func createInstance(projectId, instanceId string) error {
 	return nil
 }
 
-func createSampleDB(projectId, instanceId, databaseId string, statements ...string) error {
+func createSampleDB(projectId, instanceId, databaseId string, protoDescriptors []byte, statements ...string) error {
 	ctx := context.Background()
 	databaseAdminClient, err := database.NewDatabaseAdminClient(ctx)
 	if err != nil {
@@ -156,9 +160,10 @@ func createSampleDB(projectId, instanceId, databaseId string, statements ...stri
 	}
 	defer databaseAdminClient.Close()
 	opDB, err := databaseAdminClient.CreateDatabase(ctx, &databasepb.CreateDatabaseRequest{
-		Parent:          fmt.Sprintf("projects/%s/instances/%s", projectId, instanceId),
-		CreateStatement: fmt.Sprintf("CREATE DATABASE `%s`", databaseId),
-		ExtraStatements: statements,
+		Parent:           fmt.Sprintf("projects/%s/instances/%s", projectId, instanceId),
+		CreateStatement:  fmt.Sprintf("CREATE DATABASE `%s`", databaseId),
+		ExtraStatements:  statements,
+		ProtoDescriptors: protoDescriptors,
 	})
 	if err != nil {
 		return err
