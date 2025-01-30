@@ -43,6 +43,9 @@ func ProtobufColumns(projectId, instanceId, databaseId string) error {
 		return err
 	}
 	// Create a TicketSale object with a protobuf value.
+	// Note that concertspb.TicketOrder (the protobuf struct) implements the
+	// driver.Valuer and sql.Scanner interfaces.
+	// See the sample_model/protos/concertspb folder for the implementation.
 	ticketSale := sample_model.TicketSale{
 		Concert:      concert,
 		CustomerName: "Christin Chukwuma",
