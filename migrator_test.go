@@ -24,6 +24,7 @@ import (
 	"cloud.google.com/go/spanner"
 	"cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
 	"cloud.google.com/go/spanner/apiv1/spannerpb"
+	spannerdriver "github.com/googleapis/go-sql-spanner"
 	"github.com/googleapis/go-sql-spanner/testutil"
 	"google.golang.org/api/option"
 	"google.golang.org/protobuf/proto"
@@ -328,6 +329,31 @@ func setupTestGormConnectionWithParams(t *testing.T, params string) (db *gorm.DB
 	db, err := gorm.Open(New(Config{
 		DriverName: "spanner",
 		DSN:        fmt.Sprintf("%s/projects/p/instances/i/databases/d?useplaintext=true;%s", server.Address, params),
+	}), &gorm.Config{PrepareStmt: true, Logger: logger.Default.LogMode(logger.Silent)})
+	if err != nil {
+		serverTeardown()
+		t.Fatal(err)
+	}
+
+	return db, server, func() {
+		// TODO: Close database?
+		_ = db
+		serverTeardown()
+	}
+}
+
+func setupTestGormConnectionWithCustomConfig(t *testing.T, config spannerdriver.ConnectorConfig) (db *gorm.DB, server *testutil.MockedSpannerInMemTestServer, teardown func()) {
+	server, _, serverTeardown := setupMockedTestServer(t)
+	config.Host = server.Address
+	c, err := spannerdriver.CreateConnector(config)
+	if err != nil {
+		serverTeardown()
+		t.Fatal(err)
+	}
+
+	db, err = gorm.Open(New(Config{
+		DriverName: "spanner",
+		Connector:  c,
 	}), &gorm.Config{PrepareStmt: true, Logger: logger.Default.LogMode(logger.Silent)})
 	if err != nil {
 		serverTeardown()
