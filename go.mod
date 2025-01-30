@@ -4,10 +4,6 @@ go 1.22.7
 
 toolchain go1.23.5
 
-replace (
-	github.com/googleapis/go-sql-spanner => /Users/loite/GolandProjects/go-sql-spanner
-)
-
 require (
 	cloud.google.com/go/longrunning v0.6.4
 	cloud.google.com/go/spanner v1.74.0
