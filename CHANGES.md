@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.1](https://github.com/googleapis/go-gorm-spanner/compare/v1.5.0...v1.5.1) (2025-01-30)
+
+
+### Bug Fixes
+
+* Return clear error message for unique constraints ([#138](https://github.com/googleapis/go-gorm-spanner/issues/138)) ([e97f49b](https://github.com/googleapis/go-gorm-spanner/commit/e97f49b1b4a625adf33964fa78114bc6d06b7cda))
+
 ## [1.5.0](https://github.com/googleapis/go-gorm-spanner/compare/v1.4.0...v1.5.0) (2025-01-20)
 
 
