@@ -15,6 +15,15 @@ jobs:
           go-version: ${{ matrix.go-version }}
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: Run samples
+      - name: Run sample application
         working-directory: ./samples
         run: go run run_sample.go
+      - name: Run snippets
+        working-directory: ./samples
+        run: |
+          for filename in snippets/*.go; do
+            name=${filename##*/}
+            base=${name%.go}
+            echo "Running sample $base"
+            go run run_sample.go "$base" || ! break
+          done

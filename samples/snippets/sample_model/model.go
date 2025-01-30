@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/spanner"
+	"github.com/googleapis/go-gorm-spanner/samples/snippets/sample_model/protos/concertspb"
 	"gorm.io/gorm"
 )
 
@@ -72,4 +73,13 @@ type Concert struct {
 	SingerId  int64
 	StartTime time.Time
 	EndTime   time.Time
+}
+
+type TicketSale struct {
+	gorm.Model
+	CustomerName string
+	// Seats        []spanner.NullString
+	Concert     Concert
+	ConcertId   int64
+	TicketOrder *concertspb.TicketOrder
 }
