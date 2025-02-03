@@ -7,7 +7,7 @@ toolchain go1.23.5
 replace github.com/googleapis/go-gorm-spanner => ../
 
 require (
-	cloud.google.com/go v0.118.0
+	cloud.google.com/go v0.118.1
 	cloud.google.com/go/spanner v1.74.0
 	github.com/docker/docker v27.5.1+incompatible
 	github.com/docker/go-connections v0.5.0
