@@ -103,7 +103,7 @@ CREATE TABLE IF NOT EXISTS `ticket_sales` (
     `updated_at`    TIMESTAMP,
     `deleted_at`    TIMESTAMP,
     `customer_name` STRING(MAX) NOT NULL,
-    `seats`         ARRAY<STRING(10)> NOT NULL,
+    `seats`         ARRAY<STRING(10)>,
     `concert_id`    INT64 NOT NULL,
     `ticket_order`  examples.concerts.TicketOrder,
     CONSTRAINT `fk_ticket_sales_concerts` FOREIGN KEY (`concert_id`) REFERENCES `concerts` (`id`),
