@@ -81,7 +81,7 @@ func main() {
 	case "bit_reversed_sequence":
 		emulator.RunSampleOnEmulator(snippets.BitReversedSequence)
 	case "array_data_type":
-		emulator.RunSampleOnEmulator(snippets.ArrayDataType, ddlStatements...)
+		emulator.RunSampleOnEmulatorWithDdl(snippets.ArrayDataType, protoDescriptors, ddlStatements...)
 	case "protobuf_columns":
 		emulator.RunSampleOnEmulatorWithDdl(snippets.ProtobufColumns, protoDescriptors, ddlStatements...)
 	default:

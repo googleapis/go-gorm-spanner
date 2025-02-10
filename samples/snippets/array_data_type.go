@@ -61,7 +61,7 @@ func ArrayDataType(projectId, instanceId, databaseId string) error {
 		return fmt.Errorf("failed to open database connection: %v\n", err)
 	}
 
-	concert, err := createSingerVenueAndConcert(db)
+	concert, err := createConcert(db)
 	if err != nil {
 		return err
 	}
@@ -120,7 +120,7 @@ func ArrayDataType(projectId, instanceId, databaseId string) error {
 	return nil
 }
 
-func createSingerVenueAndConcert(db *gorm.DB) (sample_model.Concert, error) {
+func createConcert(db *gorm.DB) (sample_model.Concert, error) {
 	singer := sample_model.Singer{
 		FirstName: sql.NullString{String: "Angel", Valid: true},
 		LastName:  "Woodward",
