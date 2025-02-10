@@ -82,6 +82,8 @@ func main() {
 		emulator.RunSampleOnEmulator(snippets.BitReversedSequence)
 	case "array_data_type":
 		emulator.RunSampleOnEmulatorWithDdl(snippets.ArrayDataType, protoDescriptors, ddlStatements...)
+	case "custom_spanner_config":
+		emulator.RunSampleOnEmulator(snippets.CustomSpannerConfig)
 	case "protobuf_columns":
 		emulator.RunSampleOnEmulatorWithDdl(snippets.ProtobufColumns, protoDescriptors, ddlStatements...)
 	default:
