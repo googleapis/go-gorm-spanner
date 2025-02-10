@@ -2,16 +2,16 @@ module github.com/googleapis/go-gorm-spanner/benchmarks
 
 go 1.22.7
 
-toolchain go1.23.5
+toolchain go1.23.6
 
 replace github.com/googleapis/go-gorm-spanner => ../
 
 require (
-	cloud.google.com/go/spanner v1.74.0
+	cloud.google.com/go/spanner v1.75.0
 	github.com/google/uuid v1.6.0
 	github.com/googleapis/go-gorm-spanner v1.5.0
-	github.com/googleapis/go-sql-spanner v1.10.1
-	google.golang.org/genproto v0.0.0-20250127172529-29210b9bc287
+	github.com/googleapis/go-sql-spanner v1.11.0
+	google.golang.org/genproto v0.0.0-20250207221924-e9438ea467c6
 	google.golang.org/grpc v1.70.0
 	gorm.io/datatypes v1.2.5
 	gorm.io/gorm v1.25.12
@@ -19,8 +19,8 @@ require (
 
 require (
 	cel.dev/expr v0.19.0 // indirect
-	cloud.google.com/go v0.118.0 // indirect
-	cloud.google.com/go/auth v0.14.0 // indirect
+	cloud.google.com/go v0.118.2 // indirect
+	cloud.google.com/go/auth v0.14.1 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.7 // indirect
 	cloud.google.com/go/compute/metadata v0.6.0 // indirect
 	cloud.google.com/go/iam v1.3.1 // indirect
@@ -62,9 +62,9 @@ require (
 	golang.org/x/sys v0.29.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
 	golang.org/x/time v0.9.0 // indirect
-	google.golang.org/api v0.219.0 // indirect
+	google.golang.org/api v0.220.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250124145028-65684f501c47 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250127172529-29210b9bc287 // indirect
-	google.golang.org/protobuf v1.36.4 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250207221924-e9438ea467c6 // indirect
+	google.golang.org/protobuf v1.36.5 // indirect
 	gorm.io/driver/mysql v1.5.6 // indirect
 )
