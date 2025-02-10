@@ -87,6 +87,17 @@ func ArrayDataType(projectId, instanceId, databaseId string) error {
 	}
 	fmt.Printf("Found ticket sale %v with seats %v\n", ticketSale.ID, ticketSale.Seats)
 
+	// Create a database connection that by default decodes arrays to native Go arrays.
+	// This option should only be used if the database only contains arrays without any
+	// null elements in the arrays.
+	db, err = gorm.Open(spannergorm.New(spannergorm.Config{
+		DriverName: "spanner",
+		DSN:        fmt.Sprintf("projects/%s/instances/%s/databases/%s?decodeToNativeArrays=true", projectId, instanceId, databaseId),
+	}), &gorm.Config{})
+	if err != nil {
+		return fmt.Errorf("failed to open database connection: %v\n", err)
+	}
+
 	// Use the native array type. This type does not support NULL elements in the array.
 	// Create a TicketSale struct that uses a string array.
 	ticketSale2 := TicketSaleWithNativeArray{
