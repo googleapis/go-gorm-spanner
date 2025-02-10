@@ -78,6 +78,8 @@ func main() {
 		emulator.RunSampleOnEmulator(snippets.UuidPrimaryKey)
 	case "bit_reversed_sequence":
 		emulator.RunSampleOnEmulator(snippets.BitReversedSequence)
+	case "array_data_type":
+		emulator.RunSampleOnEmulator(snippets.ArrayDataType, ddlStatements...)
 	default:
 		fmt.Printf("unknown sample: %s\n", sample)
 		os.Exit(1)

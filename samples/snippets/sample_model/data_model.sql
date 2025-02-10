@@ -95,8 +95,8 @@ CREATE TABLE IF NOT EXISTS `ticket_sales` (
     `created_at`    TIMESTAMP,
     `updated_at`    TIMESTAMP,
     `deleted_at`    TIMESTAMP,
-    `customer_name`     STRING(MAX) NOT NULL,
-    `seats`            ARRAY<STRING(10)> NOT NULL,
-    `concert_id` INT64 NOT NULL,
+    `customer_name` STRING(MAX) NOT NULL,
+    `seats`         ARRAY<STRING(10)> NOT NULL,
+    `concert_id`    INT64 NOT NULL,
     CONSTRAINT `fk_ticket_sales_concerts` FOREIGN KEY (`concert_id`) REFERENCES `concerts` (`id`),
 ) PRIMARY KEY (`id`);
