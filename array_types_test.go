@@ -18,6 +18,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -95,19 +96,19 @@ func TestInsertNativeArrays(t *testing.T) {
 		}
 	}
 	wantValues := []string{
-		"list_value:{values:{bool_value:true}  values:{bool_value:false}}",
-		"list_value:{values:{string_value:\"Ynl0ZXMx\"}  values:{string_value:\"Ynl0ZXMy\"}}",
-		"list_value:{values:{string_value:\"2025-02-10\"}  values:{string_value:\"2000-01-01\"}}",
-		"list_value:{values:{string_value:\"1\"}  values:{string_value:\"2\"}}",
-		"list_value:{values:{number_value:3.140000104904175}  values:{number_value:6.625999927520752}}",
-		"list_value:{values:{number_value:3.14}  values:{number_value:6.626}}",
-		"list_value:{values:{string_value:\"string1\"}  values:{string_value:\"string2\"}}",
-		"list_value:{values:{string_value:\"2025-02-10T12:55:07.974Z\"}  values:{string_value:\"1970-01-01T00:00:00Z\"}}",
+		"list_value:{values:{bool_value:true} values:{bool_value:false}}",
+		"list_value:{values:{string_value:\"Ynl0ZXMx\"} values:{string_value:\"Ynl0ZXMy\"}}",
+		"list_value:{values:{string_value:\"2025-02-10\"} values:{string_value:\"2000-01-01\"}}",
+		"list_value:{values:{string_value:\"1\"} values:{string_value:\"2\"}}",
+		"list_value:{values:{number_value:3.140000104904175} values:{number_value:6.625999927520752}}",
+		"list_value:{values:{number_value:3.14} values:{number_value:6.626}}",
+		"list_value:{values:{string_value:\"string1\"} values:{string_value:\"string2\"}}",
+		"list_value:{values:{string_value:\"2025-02-10T12:55:07.974Z\"} values:{string_value:\"1970-01-01T00:00:00Z\"}}",
 		"string_value:\"1\"",
 	}
 	for i, val := range wantValues {
 		param := fmt.Sprintf("p%d", i+1)
-		if g, w := req.Params.Fields[param].String(), val; g != w {
+		if g, w := strings.ReplaceAll(req.Params.Fields[param].String(), "  ", " "), val; g != w {
 			t.Errorf("%s: param value mismatch\n Got: %v\nWant: %v", param, g, w)
 		}
 	}
@@ -230,19 +231,19 @@ func TestInsertNullArrays(t *testing.T) {
 		}
 	}
 	wantValues := []string{
-		"list_value:{values:{bool_value:true}  values:{null_value:NULL_VALUE}  values:{bool_value:false}}",
-		"list_value:{values:{string_value:\"Ynl0ZXMx\"}  values:{null_value:NULL_VALUE}  values:{string_value:\"Ynl0ZXMy\"}}",
-		"list_value:{values:{string_value:\"2025-02-10\"}  values:{null_value:NULL_VALUE}  values:{string_value:\"2000-01-01\"}}",
-		"list_value:{values:{string_value:\"1\"}  values:{null_value:NULL_VALUE}  values:{string_value:\"2\"}}",
-		"list_value:{values:{number_value:3.140000104904175}  values:{null_value:NULL_VALUE}  values:{number_value:6.625999927520752}}",
-		"list_value:{values:{number_value:3.14}  values:{null_value:NULL_VALUE}  values:{number_value:6.626}}",
-		"list_value:{values:{string_value:\"string1\"}  values:{null_value:NULL_VALUE}  values:{string_value:\"string2\"}}",
-		"list_value:{values:{string_value:\"2025-02-10T12:55:07.974Z\"}  values:{null_value:NULL_VALUE}  values:{string_value:\"1970-01-01T00:00:00Z\"}}",
+		"list_value:{values:{bool_value:true} values:{null_value:NULL_VALUE} values:{bool_value:false}}",
+		"list_value:{values:{string_value:\"Ynl0ZXMx\"} values:{null_value:NULL_VALUE} values:{string_value:\"Ynl0ZXMy\"}}",
+		"list_value:{values:{string_value:\"2025-02-10\"} values:{null_value:NULL_VALUE} values:{string_value:\"2000-01-01\"}}",
+		"list_value:{values:{string_value:\"1\"} values:{null_value:NULL_VALUE} values:{string_value:\"2\"}}",
+		"list_value:{values:{number_value:3.140000104904175} values:{null_value:NULL_VALUE} values:{number_value:6.625999927520752}}",
+		"list_value:{values:{number_value:3.14} values:{null_value:NULL_VALUE} values:{number_value:6.626}}",
+		"list_value:{values:{string_value:\"string1\"} values:{null_value:NULL_VALUE} values:{string_value:\"string2\"}}",
+		"list_value:{values:{string_value:\"2025-02-10T12:55:07.974Z\"} values:{null_value:NULL_VALUE} values:{string_value:\"1970-01-01T00:00:00Z\"}}",
 		"string_value:\"1\"",
 	}
 	for i, val := range wantValues {
 		param := fmt.Sprintf("p%d", i+1)
-		if g, w := req.Params.Fields[param].String(), val; g != w {
+		if g, w := strings.ReplaceAll(req.Params.Fields[param].String(), "  ", " "), val; g != w {
 			t.Errorf("%s: param value mismatch\n Got: %v\nWant: %v", param, g, w)
 		}
 	}
