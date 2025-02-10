@@ -28,6 +28,9 @@ import (
 //go:embed snippets/sample_model/data_model.sql
 var createDataModelSQL string
 
+//go:embed snippets/sample_model/protos/order.pb
+var protoDescriptors []byte
+
 func main() {
 	// Run the larger sample application.
 	if len(os.Args) == 1 {
@@ -43,43 +46,44 @@ func main() {
 	})
 	// Skip the last (empty) statement.
 	ddlStatements = ddlStatements[0 : len(ddlStatements)-1]
-
 	// Run one of the sample snippets.
 	sample := os.Args[1]
 
 	switch sample {
 	case "hello_world":
-		emulator.RunSampleOnEmulator(snippets.HelloWorld, ddlStatements...)
+		emulator.RunSampleOnEmulatorWithDdl(snippets.HelloWorld, protoDescriptors, ddlStatements...)
 	case "insert_data":
-		emulator.RunSampleOnEmulator(snippets.InsertData, ddlStatements...)
+		emulator.RunSampleOnEmulatorWithDdl(snippets.InsertData, protoDescriptors, ddlStatements...)
 	case "upsert":
-		emulator.RunSampleOnEmulator(snippets.Upsert, ddlStatements...)
+		emulator.RunSampleOnEmulatorWithDdl(snippets.Upsert, protoDescriptors, ddlStatements...)
 	case "batch_insert":
-		emulator.RunSampleOnEmulator(snippets.CreateInBatches, ddlStatements...)
+		emulator.RunSampleOnEmulatorWithDdl(snippets.CreateInBatches, protoDescriptors, ddlStatements...)
 	case "find_in_batches":
-		emulator.RunSampleOnEmulator(snippets.FindInBatches, ddlStatements...)
+		emulator.RunSampleOnEmulatorWithDdl(snippets.FindInBatches, protoDescriptors, ddlStatements...)
 	case "batch_dml":
-		emulator.RunSampleOnEmulator(snippets.BatchDml, ddlStatements...)
+		emulator.RunSampleOnEmulatorWithDdl(snippets.BatchDml, protoDescriptors, ddlStatements...)
 	case "auto_save_associations":
-		emulator.RunSampleOnEmulator(snippets.AutoSaveAssociations, ddlStatements...)
+		emulator.RunSampleOnEmulatorWithDdl(snippets.AutoSaveAssociations, protoDescriptors, ddlStatements...)
 	case "interleaved_tables":
-		emulator.RunSampleOnEmulator(snippets.InterleavedTables, ddlStatements...)
+		emulator.RunSampleOnEmulatorWithDdl(snippets.InterleavedTables, protoDescriptors, ddlStatements...)
 	case "read_only_transaction":
-		emulator.RunSampleOnEmulator(snippets.ReadOnlyTransaction, ddlStatements...)
+		emulator.RunSampleOnEmulatorWithDdl(snippets.ReadOnlyTransaction, protoDescriptors, ddlStatements...)
 	case "read_write_transaction":
-		emulator.RunSampleOnEmulator(snippets.ReadWriteTransaction, ddlStatements...)
+		emulator.RunSampleOnEmulatorWithDdl(snippets.ReadWriteTransaction, protoDescriptors, ddlStatements...)
 	case "aborted_transaction":
-		emulator.RunSampleOnEmulator(snippets.AbortedTransaction, ddlStatements...)
+		emulator.RunSampleOnEmulatorWithDdl(snippets.AbortedTransaction, protoDescriptors, ddlStatements...)
 	case "migrations":
 		emulator.RunSampleOnEmulator(snippets.Migrations)
 	case "client_library":
-		emulator.RunSampleOnEmulator(snippets.ClientLibrary, ddlStatements...)
+		emulator.RunSampleOnEmulatorWithDdl(snippets.ClientLibrary, protoDescriptors, ddlStatements...)
 	case "uuid_primary_key":
 		emulator.RunSampleOnEmulator(snippets.UuidPrimaryKey)
 	case "bit_reversed_sequence":
 		emulator.RunSampleOnEmulator(snippets.BitReversedSequence)
 	case "array_data_type":
 		emulator.RunSampleOnEmulator(snippets.ArrayDataType, ddlStatements...)
+	case "protobuf_columns":
+		emulator.RunSampleOnEmulatorWithDdl(snippets.ProtobufColumns, protoDescriptors, ddlStatements...)
 	default:
 		fmt.Printf("unknown sample: %s\n", sample)
 		os.Exit(1)

@@ -90,6 +90,13 @@ CREATE SEQUENCE IF NOT EXISTS `ticket_sales_seq` OPTIONS (
     skip_range_max=1000000
 );
 
+CREATE PROTO BUNDLE (
+  examples.concerts.Address,
+  examples.concerts.Item,
+  examples.concerts.TicketOrder,
+  examples.concerts.TicketOrderHistory
+);
+
 CREATE TABLE IF NOT EXISTS `ticket_sales` (
     `id` INT64 DEFAULT (GET_NEXT_SEQUENCE_VALUE(Sequence ticket_sales_seq)),
     `created_at`    TIMESTAMP,
@@ -98,5 +105,6 @@ CREATE TABLE IF NOT EXISTS `ticket_sales` (
     `customer_name` STRING(MAX) NOT NULL,
     `seats`         ARRAY<STRING(10)> NOT NULL,
     `concert_id`    INT64 NOT NULL,
+    `ticket_order`  examples.concerts.TicketOrder,
     CONSTRAINT `fk_ticket_sales_concerts` FOREIGN KEY (`concert_id`) REFERENCES `concerts` (`id`),
 ) PRIMARY KEY (`id`);
