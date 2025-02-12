@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.6.0](https://github.com/googleapis/go-gorm-spanner/compare/v1.5.0...v1.6.0) (2025-02-12)
+
+
+### Features
+
+* Add native array data types ([#144](https://github.com/googleapis/go-gorm-spanner/issues/144)) ([6ecbebd](https://github.com/googleapis/go-gorm-spanner/commit/6ecbebd2973531414b78d1c43771ce452052a06a))
+* Support custom Spanner configurations ([#136](https://github.com/googleapis/go-gorm-spanner/issues/136)) ([abc6937](https://github.com/googleapis/go-gorm-spanner/commit/abc69376fbda7def0862ce7e278312cefec3b9ae))
+
+
+### Bug Fixes
+
+* Return clear error message for unique constraints ([#138](https://github.com/googleapis/go-gorm-spanner/issues/138)) ([e97f49b](https://github.com/googleapis/go-gorm-spanner/commit/e97f49b1b4a625adf33964fa78114bc6d06b7cda))
+
+
+### Documentation
+
+* Add sample for using protobuf columns ([#140](https://github.com/googleapis/go-gorm-spanner/issues/140)) ([ea1290a](https://github.com/googleapis/go-gorm-spanner/commit/ea1290ac8d06fa149f783b81dee7103f65083ef7))
+
 ## [1.5.0](https://github.com/googleapis/go-gorm-spanner/compare/v1.4.0...v1.5.0) (2025-01-20)
 
 
