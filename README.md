@@ -54,6 +54,32 @@ The Cloud Spanner GORM supports the following connection URL properties
 
 Example: `projects/my-project/instances/my-instance/databases/my-db;minSessions=100;maxSessions=400;numChannels=4;retryAbortsInternally=true;disableRouteToLeader=false;usePlainText=false`
 
+#### Additional Spanner Configuration
+You can also connect `gorm` to Spanner using a `driver.Connector`. This allows you to supply additional configuration
+for the Spanner client that should be used for `gorm`:
+
+```go
+// Create a function that sets the Spanner client configuration for the database connection.
+configureFunction := func(config *spanner.ClientConfig, opts *[]option.ClientOption) {
+    // Set a default query optimizer version that the client should use.
+    config.QueryOptions = spanner.QueryOptions{Options: &spannerpb.ExecuteSqlRequest_QueryOptions{OptimizerVersion: "1"}}
+}
+// Create a ConnectorConfig to use with the Spanner database/sql driver.
+config := spannerdriver.ConnectorConfig{
+    Project:      projectId,
+    Instance:     instanceId,
+    Database:     databaseId,
+    Configurator: configureFunction,
+}
+// Create a Connector for Spanner. This Connector instance should be re-used for all gorm connections.
+c, err := spannerdriver.CreateConnector(config)
+db, err := gorm.Open(
+    spannergorm.New(spannergorm.Config{Connector: c}),
+    &gorm.Config{PrepareStmt: true})
+```
+
+See [custom_spanner_config.go](samples/snippets/custom_spanner_config.go) for a working sample application.
+
 ## Emulator
 
 See the [Google Cloud Spanner Emulator](https://cloud.google.com/spanner/docs/emulator) support to learn how to start the emulator.
@@ -70,26 +96,32 @@ $ export SPANNER_EMULATOR_HOST=localhost:9010
 Our libraries are compatible with at least the three most recent, major Go
 releases. They are currently compatible with:
 
-- Go 1.21
-- Go 1.20
-- Go 1.19
+- Go 1.23
+- Go 1.22
 
 ## Data Types
-Cloud Spanner supports the following data types in combination with `gorm`.
+Spanner supports the following data types in combination with `gorm`.
 
-| Cloud Spanner Type       | gorm / go type               |
-|--------------------------|------------------------------|
-| bool                     | bool, sql.NullBool           |
-| int64                    | uint, int64, sql.NullInt64   |
-| string                   | string, sql.NullString       |
-| json                     | spanner.NullJSON             |
-| float64                  | float64, sql.NullFloat64     |
-| float32                  | float32, spanner.NullFloat32 |
-| numeric                  | decimal.NullDecimal          |
-| timestamp with time zone | time.Time, sql.NullTime      |
-| date                     | datatypes.Date               |
-| bytes                    | []byte                       |
+| Cloud Spanner Type       | gorm / go type                                    |
+|--------------------------|---------------------------------------------------|
+| bool                     | bool, sql.NullBool, spanner.NullBool              |
+| int64                    | uint, int64, sql.NullInt64, spanner.NullInt64     |
+| string                   | string, sql.NullString, spanner.NullString        |
+| json                     | spanner.NullJSON                                  |
+| float64                  | float64, sql.NullFloat64, spanner.NullFloat64     |
+| float32                  | float32, spanner.NullFloat32, spanner.NullFloat32 |
+| numeric                  | big.Rat, spanner.NullNumeric                      |
+| timestamp with time zone | time.Time, sql.NullTime, spanner.NullTime         |
+| date                     | civil.Date, spanner.NullDate                      |
+| bytes                    | []byte                                            |
 
+See [data_types.go](samples/snippets/data_types.go) for a working sample for each
+data type.
+
+You can also use arrays and protobuf columns with `gorm`. See the following samples
+for how to map and use those types:
+* Arrays: [array_data_type.go](/samples/snippets/array_data_type.go)
+* Protobuf: [protobuf_columns.go](/samples/snippets/protobuf_columns.go)
 
 ## AutoMigrate Dry Run
 The Spanner `gorm` dialect supports dry-runs for auto-migration. Use this to get the

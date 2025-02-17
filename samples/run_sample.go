@@ -86,6 +86,8 @@ func main() {
 		emulator.RunSampleOnEmulator(snippets.CustomSpannerConfig)
 	case "protobuf_columns":
 		emulator.RunSampleOnEmulatorWithDdl(snippets.ProtobufColumns, protoDescriptors, ddlStatements...)
+	case "data_types":
+		emulator.RunSampleOnEmulator(snippets.DataTypes)
 	default:
 		fmt.Printf("unknown sample: %s\n", sample)
 		os.Exit(1)

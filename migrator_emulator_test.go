@@ -18,10 +18,12 @@ import (
 	"context"
 	"database/sql"
 	"log"
+	"math/big"
 	"reflect"
 	"testing"
 	"time"
 
+	"cloud.google.com/go/civil"
 	"cloud.google.com/go/spanner"
 	database "cloud.google.com/go/spanner/admin/database/apiv1"
 	"cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
@@ -79,6 +81,42 @@ type Concert struct {
 	SingerId  int64
 	StartTime time.Time `gorm:"index:idx_concerts_time"`
 	EndTime   time.Time `gorm:"index:idx_concerts_time"`
+}
+
+type AllTypes struct {
+	ID           int64
+	ColBool      bool
+	ColBytes     []byte
+	ColDate      civil.Date `gorm:"type:date"`
+	ColFloat32   float32
+	ColFloat64   float64
+	ColInt64     int64
+	ColJson      spanner.NullJSON
+	ColNumeric   big.Rat `gorm:"type:numeric"`
+	ColString    string
+	ColTimestamp time.Time
+}
+
+type SqlNullTypes struct {
+	ID           int64
+	ColBool      sql.NullBool
+	ColFloat64   sql.NullFloat64
+	ColInt64     sql.NullInt64
+	ColString    sql.NullString
+	ColTimestamp sql.NullTime
+}
+
+type AllNullTypes struct {
+	ID           int64
+	ColBool      spanner.NullBool
+	ColDate      spanner.NullDate
+	ColFloat32   spanner.NullFloat32
+	ColFloat64   spanner.NullFloat64
+	ColInt64     spanner.NullInt64
+	ColJson      spanner.NullJSON
+	ColNumeric   spanner.NullNumeric
+	ColString    spanner.NullString
+	ColTimestamp spanner.NullTime
 }
 
 // The tests in this file are only executed on the emulator, as they would be relatively slow
@@ -373,5 +411,181 @@ func TestMigrateUniqueFieldFails(t *testing.T) {
 
 	if g, w := db.AutoMigrate(&As{}), errUniqueConstraintNotSupported; g != w {
 		t.Fatalf("second migrate error mismatch\n Got: %v\nWant: %v", g, w)
+	}
+}
+
+func TestMigrateAllTypes(t *testing.T) {
+	skipIfShortOrNotEmulator(t)
+	t.Parallel()
+
+	dsn, cleanup, err := testutil.CreateTestDB(context.Background())
+	if err != nil {
+		log.Fatalf("could not init integration tests while creating database: %v", err)
+	}
+	defer cleanup()
+	// Open db.
+	db, err := gorm.Open(New(Config{
+		DriverName: "spanner",
+		DSN:        dsn,
+	}), &gorm.Config{PrepareStmt: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := db.AutoMigrate(&AllTypes{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.AutoMigrate(&SqlNullTypes{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.AutoMigrate(&AllNullTypes{}); err != nil {
+		t.Fatal(err)
+	}
+	verifyColumnType(t, db, "all_types", "col_bool", "BOOL")
+	verifyColumnType(t, db, "all_types", "col_bytes", "BYTES(MAX)")
+	verifyColumnType(t, db, "all_types", "col_date", "DATE")
+	verifyColumnType(t, db, "all_types", "col_float32", "FLOAT32")
+	verifyColumnType(t, db, "all_types", "col_float64", "FLOAT64")
+	verifyColumnType(t, db, "all_types", "col_int64", "INT64")
+	verifyColumnType(t, db, "all_types", "col_json", "JSON")
+	verifyColumnType(t, db, "all_types", "col_numeric", "NUMERIC")
+	verifyColumnType(t, db, "all_types", "col_string", "STRING(MAX)")
+	verifyColumnType(t, db, "all_types", "col_timestamp", "TIMESTAMP")
+
+	verifyColumnType(t, db, "sql_null_types", "col_bool", "BOOL")
+	verifyColumnType(t, db, "sql_null_types", "col_float64", "FLOAT64")
+	verifyColumnType(t, db, "sql_null_types", "col_int64", "INT64")
+	verifyColumnType(t, db, "sql_null_types", "col_string", "STRING(MAX)")
+	verifyColumnType(t, db, "sql_null_types", "col_timestamp", "TIMESTAMP")
+
+	verifyColumnType(t, db, "all_null_types", "col_bool", "BOOL")
+	verifyColumnType(t, db, "all_null_types", "col_date", "DATE")
+	verifyColumnType(t, db, "all_null_types", "col_float32", "FLOAT32")
+	verifyColumnType(t, db, "all_null_types", "col_float64", "FLOAT64")
+	verifyColumnType(t, db, "all_null_types", "col_int64", "INT64")
+	verifyColumnType(t, db, "all_null_types", "col_json", "JSON")
+	verifyColumnType(t, db, "all_null_types", "col_numeric", "NUMERIC")
+	verifyColumnType(t, db, "all_null_types", "col_string", "STRING(MAX)")
+	verifyColumnType(t, db, "all_null_types", "col_timestamp", "TIMESTAMP")
+
+	// Verify that we can insert and retrieve data for all the above data types.
+	timeValue, err := time.Parse(time.RFC3339, "2025-02-17T11:14:00+01:00")
+	if err != nil {
+		t.Fatalf("could not parse time: %v", err)
+	}
+	rowAllTypes := AllTypes{
+		ID:           1,
+		ColBool:      true,
+		ColBytes:     []byte("test"),
+		ColDate:      civil.Date{Year: 2025, Month: 2, Day: 17},
+		ColFloat32:   float32(3.14),
+		ColFloat64:   3.14,
+		ColInt64:     int64(-1),
+		ColJson:      spanner.NullJSON{Value: "{\"key\": \"value\"}", Valid: true},
+		ColNumeric:   *(&big.Rat{}).SetFloat64(3.14),
+		ColString:    "test",
+		ColTimestamp: timeValue,
+	}
+	if err := db.Create(&rowAllTypes).Error; err != nil {
+		t.Fatalf("could not insert AllTypes row: %v", err)
+	}
+
+	rowSqlNullTypesWithoutValues := SqlNullTypes{ID: 1}
+	if err := db.Create(&rowSqlNullTypesWithoutValues).Error; err != nil {
+		t.Fatalf("could not insert SqlNullTypes row without values: %v", err)
+	}
+	rowSqlNullTypes := SqlNullTypes{
+		ID:           2,
+		ColBool:      sql.NullBool{Bool: rowAllTypes.ColBool, Valid: true},
+		ColFloat64:   sql.NullFloat64{Float64: rowAllTypes.ColFloat64, Valid: true},
+		ColInt64:     sql.NullInt64{Int64: rowAllTypes.ColInt64, Valid: true},
+		ColString:    sql.NullString{String: rowAllTypes.ColString, Valid: true},
+		ColTimestamp: sql.NullTime{Time: rowAllTypes.ColTimestamp, Valid: true},
+	}
+	if err := db.Create(&rowSqlNullTypes).Error; err != nil {
+		t.Fatalf("could not insert SqlNullTypes row with values: %v", err)
+	}
+
+	rowAllNullTypesWithoutValues := AllNullTypes{ID: 1}
+	if err := db.Create(&rowAllNullTypesWithoutValues).Error; err != nil {
+		t.Fatalf("could not insert AllNullTypes row without values: %v", err)
+	}
+	rowAllNullTypes := AllNullTypes{
+		ID:           2,
+		ColBool:      spanner.NullBool{Bool: rowAllTypes.ColBool, Valid: true},
+		ColDate:      spanner.NullDate{Date: rowAllTypes.ColDate, Valid: true},
+		ColFloat32:   spanner.NullFloat32{Float32: rowAllTypes.ColFloat32, Valid: true},
+		ColFloat64:   spanner.NullFloat64{Float64: rowAllTypes.ColFloat64, Valid: true},
+		ColInt64:     spanner.NullInt64{Int64: rowAllTypes.ColInt64, Valid: true},
+		ColJson:      spanner.NullJSON{Value: rowAllTypes.ColJson.Value, Valid: true},
+		ColNumeric:   spanner.NullNumeric{Numeric: rowAllTypes.ColNumeric, Valid: true},
+		ColString:    spanner.NullString{StringVal: rowAllTypes.ColString, Valid: true},
+		ColTimestamp: spanner.NullTime{Time: rowAllTypes.ColTimestamp, Valid: true},
+	}
+	if err := db.Create(&rowAllNullTypes).Error; err != nil {
+		t.Fatalf("could not insert AllNullTypes row with values: %v", err)
+	}
+
+	// Verify that we can get all types.
+	var rowAllTypesRead AllTypes
+	if err := db.Find(&rowAllTypesRead, 1).Error; err != nil {
+		t.Fatalf("could not read AllTypes: %v", err)
+	}
+	if g, w := rowAllTypesRead, rowAllTypes; !cmp.Equal(g, w, cmp.Comparer(func(n1, n2 big.Rat) bool {
+		return spanner.NumericString(&n1) == spanner.NumericString(&n2)
+	})) {
+		t.Fatalf("AllTypes row mismatch\n Got: %v\nWant: %v", g, w)
+	}
+
+	var rowSqlNullTypesWithoutValuesRead SqlNullTypes
+	if err := db.Find(&rowSqlNullTypesWithoutValuesRead, 1).Error; err != nil {
+		t.Fatalf("could not read SqlNullTypes without values: %v", err)
+	}
+	if g, w := rowSqlNullTypesWithoutValuesRead, rowSqlNullTypesWithoutValues; !cmp.Equal(g, w) {
+		t.Fatalf("SqlNullTypes without values row mismatch\n Got: %v\nWant: %v", g, w)
+	}
+	var rowSqlNullTypesRead SqlNullTypes
+	if err := db.Find(&rowSqlNullTypesRead, 2).Error; err != nil {
+		t.Fatalf("could not read SqlNullTypes: %v", err)
+	}
+	if g, w := rowSqlNullTypesRead, rowSqlNullTypes; !cmp.Equal(g, w) {
+		t.Fatalf("SqlNullTypes row mismatch\n Got: %v\nWant: %v", g, w)
+	}
+
+	var rowAllNullTypesWithoutValuesRead AllNullTypes
+	if err := db.Find(&rowAllNullTypesWithoutValuesRead, 1).Error; err != nil {
+		t.Fatalf("could not read AllNullTypes without values: %v", err)
+	}
+	if g, w := rowAllNullTypesWithoutValuesRead, rowAllNullTypesWithoutValues; !cmp.Equal(g, w, cmp.Comparer(func(n1, n2 spanner.NullNumeric) bool {
+		return n1.Valid == false && n2.Valid == false
+	})) {
+		t.Fatalf("AllNullTypes without values row mismatch\n Got: %v\nWant: %v", g, w)
+	}
+	var rowAllNullTypesRead AllNullTypes
+	if err := db.Find(&rowAllNullTypesRead, 2).Error; err != nil {
+		t.Fatalf("could not read AllNullTypes: %v", err)
+	}
+	if g, w := rowAllNullTypesRead, rowAllNullTypes; !cmp.Equal(g, w, cmp.Comparer(func(n1, n2 spanner.NullNumeric) bool {
+		return spanner.NumericString(&n1.Numeric) == spanner.NumericString(&n2.Numeric)
+	})) {
+		t.Fatalf("AllNullTypes row mismatch\n Got: %v\nWant: %v", g, w)
+	}
+}
+
+func verifyColumnType(t *testing.T, db *gorm.DB, table, column, want string) {
+	query := "select spanner_type from information_schema.columns where table_name=? and column_name=?"
+	row := db.ConnPool.QueryRowContext(context.Background(), query, table, column)
+	if row == nil {
+		t.Fatalf("no column %v.%v found", table, column)
+	}
+	if err := row.Err(); err != nil {
+		t.Fatalf("failed to get data type of column %v.%v: %v", table, column, err)
+	}
+	var tp string
+	if err := row.Scan(&tp); err != nil {
+		t.Fatalf("failed to scan data type of column %v.%v: %v", table, column, err)
+	}
+	if g, w := tp, want; g != w {
+		t.Fatalf("data type mismatch for column %v.%v\n Got: %v\nWant: %v", table, column, g, w)
 	}
 }
