@@ -336,6 +336,29 @@ func TestCustomSpannerConfig(t *testing.T) {
 	}
 }
 
+func TestSelectForUpdate(t *testing.T) {
+	t.Parallel()
+
+	db, server, teardown := setupTestGormConnection(t)
+	defer teardown()
+
+	query := "SELECT * FROM `singers` WHERE `singers`.`id` = @p1 AND `singers`.`deleted_at` IS NULL FOR UPDATE"
+	_ = putSelectSingerRowResult(server, query)
+	var s singer
+	if err := db.Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate}).Find(&s, 1).Error; err != nil {
+		t.Fatalf("failed to load singer FOR UPDATE lock: %v", err)
+	}
+	requests := drainRequestsFromServer(server.TestSpanner)
+	executeRequests := requestsOfType(requests, reflect.TypeOf(&spannerpb.ExecuteSqlRequest{}))
+	if g, w := len(executeRequests), 2; g != w {
+		t.Fatalf("num execute requests mismatch\n Got: %v\nWant: %v", g, w)
+	}
+	request := executeRequests[1].(*spannerpb.ExecuteSqlRequest)
+	if g, w := request.Sql, query; g != w {
+		t.Fatalf("query mismatch\n Got: %v\nWant: %v", g, w)
+	}
+}
+
 func filter(requests []interface{}, sql string) (ret []*spannerpb.ExecuteSqlRequest) {
 	for _, i := range requests {
 		if req, ok := i.(*spannerpb.ExecuteSqlRequest); ok {
