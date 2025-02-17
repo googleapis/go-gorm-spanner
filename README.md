@@ -113,16 +113,15 @@ statements, err := migrator.AutoMigrateDryRun(tables...)
 ```
 
 ## Limitations
-The Cloud Spanner `gorm` dialect has the following known limitations:
+The Spanner `gorm` dialect has the following known limitations:
 
-| Limitation                                                                                     | Workaround                                                                                                                                                                                                                     |
-|------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Nested transactions                                                                            | Nested transactions and savepoints are not supported. It is therefore recommended to set the configuration option `DisableNestedTransaction: true,`                                                                            |
-| Locking                                                                                        | Lock clauses (e.g. `clause.Locking{Strength: "UPDATE"}`) are not supported. These are generally speaking also not required, as the default isolation level that is used by Cloud Spanner is serializable.                      |
-| [gorm.Automigrate](https://gorm.io/docs/migration.html#Auto-Migration) with interleaved tables | [Interleaved tables](samples/sample_application) are supported by the Cloud Spanner `gorm` dialect, but Auto-Migration does not support interleaved tables. It is therefore recommended to create interleaved tables manually. |
-| [Cloud Spanner stale reads](https://cloud.google.com/spanner/docs/reads#go)                    | Stale reads are not supported by gorm.                                                                                                                                                                                         |    
+| Limitation                                                                                     | Workaround                                                                                                                                                                                                               |
+|------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Nested transactions                                                                            | Nested transactions and savepoints are not supported. It is therefore recommended to set the configuration option `DisableNestedTransaction: true,`                                                                      |
+| [gorm.Automigrate](https://gorm.io/docs/migration.html#Auto-Migration) with interleaved tables | [Interleaved tables](samples/sample_application) are supported by the Spanner `gorm` dialect, but Auto-Migration does not support interleaved tables. It is therefore recommended to create interleaved tables manually. |
+| [Spanner stale reads](https://cloud.google.com/spanner/docs/reads#go)                          | Stale reads are not supported by gorm.                                                                                                                                                                                   |
 
-For the complete list of the limitations, see the [Cloud Spanner GORM limitations](https://github.com/googleapis/go-gorm-spanner/blob/main/docs/limitations.md).
+For the complete list of the limitations, see the [Spanner GORM limitations](/docs/limitations.md).
 
 ### Nested Transactions
 `gorm` uses savepoints for nested transactions. Savepoints are currently not supported by Cloud Spanner. Nested
