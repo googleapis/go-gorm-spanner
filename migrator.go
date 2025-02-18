@@ -18,6 +18,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"os"
 	"slices"
 	"sort"
 	"strings"
@@ -75,13 +76,52 @@ func (m spannerMigrator) AutoMigrate(values ...interface{}) error {
 	return err
 }
 
+func (m spannerMigrator) hasDefaultSequenceKind() (bool, error) {
+	currentDatabase := m.DB.Migrator().CurrentDatabase()
+	row := m.DB.Raw("select option_value "+
+		"from information_schema.database_options "+
+		"where schema_name=? "+
+		"and lower(option_name)='default_sequence_kind'", currentDatabase).Row()
+	if row == nil {
+		return false, nil
+	}
+	if err := row.Err(); err != nil {
+		return false, err
+	}
+	var def string
+	if err := row.Scan(&def); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
 func (m spannerMigrator) autoMigrate(dryRun bool, values ...interface{}) ([]spanner.Statement, error) {
+	var err error
+	hasDefaultSequenceKind := false
+	if !m.Dialector.Config.DisableSetDefaultSequenceKind {
+		hasDefaultSequenceKind, err = m.hasDefaultSequenceKind()
+		if err != nil {
+			return nil, err
+		}
+	}
+	// TODO: Remove when the emulator returns the right value in database_options.
+	if os.Getenv("SPANNER_EMULATOR_HOST") != "" {
+		// Just set the default and ignore any errors.
+		_ = m.maybeSetDefaultSequenceKind(false)
+		hasDefaultSequenceKind = true
+	}
 	if dryRun || !m.Dialector.Config.DisableAutoMigrateBatching {
 		if err := m.StartBatchDDL(); err != nil {
 			return nil, err
 		}
 	}
-	err := m.Migrator.AutoMigrate(values...)
+	if err := m.maybeSetDefaultSequenceKind(hasDefaultSequenceKind); err != nil {
+		return nil, err
+	}
+	err = m.Migrator.AutoMigrate(values...)
 	if err == nil {
 		if !dryRun && m.Dialector.Config.DisableAutoMigrateBatching {
 			return nil, nil
@@ -110,6 +150,20 @@ func (m spannerMigrator) autoMigrate(dryRun bool, values ...interface{}) ([]span
 	return nil, err
 }
 
+func (m spannerMigrator) maybeSetDefaultSequenceKind(hasDefaultSequenceKind bool) error {
+	if !hasDefaultSequenceKind && !m.Dialector.Config.DisableSetDefaultSequenceKind {
+		def := m.Dialector.Config.DefaultSequenceKind
+		if def == "" {
+			def = "bit_reversed_positive"
+		}
+		if err := m.DB.Exec(fmt.Sprintf("ALTER DATABASE db SET OPTIONS (default_sequence_kind = '%s')", def)).Error; err != nil {
+			_ = m.AbortBatch()
+			return err
+		}
+	}
+	return nil
+}
+
 func (m spannerMigrator) StartBatchDDL() error {
 	return m.DB.Exec("START BATCH DDL").Error
 }
@@ -125,6 +179,9 @@ func (m spannerMigrator) AbortBatch() error {
 // FullDataTypeOf returns field's db full data type
 func (m spannerMigrator) FullDataTypeOf(field *schema.Field) (expr clause.Expr) {
 	expr.SQL = m.Migrator.DataTypeOf(field)
+	if field.AutoIncrement && !(field.HasDefaultValue && (field.DefaultValueInterface != nil || field.DefaultValue != "")) {
+		expr.SQL += " AUTO_INCREMENT"
+	}
 
 	if field.NotNull {
 		expr.SQL += " NOT NULL"
@@ -153,21 +210,22 @@ func (m spannerMigrator) CreateTable(values ...interface{}) error {
 				hasPrimaryKeyInDataType bool
 			)
 			for _, f := range stmt.Schema.Fields {
-				// Cloud spanner does not support auto incrementing primary keys.
-				if f.AutoIncrement && f.HasDefaultValue && f.DefaultValue == "" && f.DefaultValueInterface == nil {
-					sequence := f.Tag.Get(gormSpannerSequenceTag)
-					if sequence == "" {
-						sequence = stmt.Table + "_seq"
+				sequence := f.Tag.Get(gormSpannerSequenceTag)
+				if sequence != "" {
+					if f.AutoIncrement && f.HasDefaultValue && f.DefaultValue == "" && f.DefaultValueInterface == nil {
+						if sequence == "" {
+							sequence = stmt.Table + "_seq"
+						}
+						if err := tx.Exec("CREATE SEQUENCE IF NOT EXISTS " +
+							sequence +
+							` OPTIONS (sequence_kind = "bit_reversed_positive")`).Error; err != nil {
+							return err
+						}
+						f.DefaultValue = "GET_NEXT_SEQUENCE_VALUE(Sequence " + sequence + ")"
+						// Reset the default value to nothing after finishing migration.
+						//goland:noinspection GoDeferInLoop
+						defer func() { f.DefaultValue = "" }()
 					}
-					if err := tx.Exec("CREATE SEQUENCE IF NOT EXISTS " +
-						sequence +
-						` OPTIONS (sequence_kind = "bit_reversed_positive")`).Error; err != nil {
-						return err
-					}
-					f.DefaultValue = "GET_NEXT_SEQUENCE_VALUE(Sequence " + sequence + ")"
-					// Reset the default value to nothing after finishing migration.
-					//goland:noinspection GoDeferInLoop
-					defer func() { f.DefaultValue = "" }()
 				}
 			}
 			for _, dbName := range stmt.Schema.DBNames {
