@@ -74,6 +74,9 @@ func TestMigrate(t *testing.T) {
 			Result: &longrunningpb.Operation_Response{Response: anyProto},
 		},
 	})
+	if putDefaultSequenceKindResult(server, "") != nil {
+		t.Fatal(err)
+	}
 
 	err = db.Migrator().AutoMigrate(&singer{}, &album{}, &test{})
 	if err != nil {
@@ -84,44 +87,47 @@ func TestMigrate(t *testing.T) {
 		t.Fatalf("request count mismatch\n Got: %v\nWant: %v", g, w)
 	}
 	request := requests[0].(*databasepb.UpdateDatabaseDdlRequest)
-	if g, w := len(request.GetStatements()), 8; g != w {
+	if g, w := len(request.GetStatements()), 7; g != w {
 		t.Fatalf("statement count mismatch\n Got: %v\nWant: %v", g, w)
 	}
-	if g, w := request.GetStatements()[0],
-		`CREATE SEQUENCE IF NOT EXISTS singers_seq OPTIONS (sequence_kind = "bit_reversed_positive")`; g != w {
+	index := 0
+	if g, w := request.GetStatements()[index],
+		`ALTER DATABASE db SET OPTIONS (default_sequence_kind = 'bit_reversed_positive')`; g != w {
 		t.Fatalf("create singers sequence statement text mismatch\n Got: %s\nWant: %s", g, w)
 	}
-	if g, w := request.GetStatements()[1],
+	index++
+	if g, w := request.GetStatements()[index],
 		"CREATE TABLE `singers` ("+
-			"`id` INT64 DEFAULT (GET_NEXT_SEQUENCE_VALUE(Sequence singers_seq)),`created_at` TIMESTAMP,`updated_at` TIMESTAMP,`deleted_at` TIMESTAMP,"+
+			"`id` INT64 AUTO_INCREMENT,`created_at` TIMESTAMP,`updated_at` TIMESTAMP,`deleted_at` TIMESTAMP,"+
 			"`first_name` STRING(MAX),`last_name` STRING(MAX),`full_name` STRING(MAX),`active` BOOL) "+
 			"PRIMARY KEY (`id`)"; g != w {
 		t.Fatalf("create singers statement text mismatch\n Got: %s\nWant: %s", g, w)
 	}
-	if g, w := request.GetStatements()[2],
+	index++
+	if g, w := request.GetStatements()[index],
 		"CREATE INDEX `idx_singers_deleted_at` ON `singers`(`deleted_at`)"; g != w {
 		t.Fatalf("create idx_singers_deleted_at statement text mismatch\n Got: %s\nWant: %s", g, w)
 	}
-	if g, w := request.GetStatements()[3],
-		`CREATE SEQUENCE IF NOT EXISTS albums_seq OPTIONS (sequence_kind = "bit_reversed_positive")`; g != w {
-		t.Fatalf("create albums sequence statement text mismatch\n Got: %s\nWant: %s", g, w)
-	}
-	if g, w := request.GetStatements()[4],
-		"CREATE TABLE `albums` (`id` INT64 DEFAULT (GET_NEXT_SEQUENCE_VALUE(Sequence albums_seq)),`created_at` TIMESTAMP,`updated_at` TIMESTAMP,`deleted_at` TIMESTAMP,"+
+	index++
+	if g, w := request.GetStatements()[index],
+		"CREATE TABLE `albums` (`id` INT64 AUTO_INCREMENT,`created_at` TIMESTAMP,`updated_at` TIMESTAMP,`deleted_at` TIMESTAMP,"+
 			"`title` STRING(MAX),`rating` FLOAT32,`singer_id` INT64,"+
 			"CONSTRAINT `fk_albums_singer` FOREIGN KEY (`singer_id`) REFERENCES `singers`(`id`)) "+
 			"PRIMARY KEY (`id`)"; g != w {
 		t.Fatalf("create albums statement text mismatch\n Got: %s\nWant: %s", g, w)
 	}
-	if g, w := request.GetStatements()[5],
+	index++
+	if g, w := request.GetStatements()[index],
 		"CREATE INDEX `idx_albums_deleted_at` ON `albums`(`deleted_at`)"; g != w {
 		t.Fatalf("create idx_albums_deleted_at statement text mismatch\n Got: %s\nWant: %s", g, w)
 	}
-	if g, w := request.GetStatements()[6],
+	index++
+	if g, w := request.GetStatements()[index],
 		`CREATE SEQUENCE IF NOT EXISTS overrided_sequence_name OPTIONS (sequence_kind = "bit_reversed_positive")`; g != w {
 		t.Fatalf("create albums sequence statement text mismatch\n Got: %s\nWant: %s", g, w)
 	}
-	if g, w := request.GetStatements()[7],
+	index++
+	if g, w := request.GetStatements()[index],
 		"CREATE TABLE `tests` (`id` INT64 DEFAULT (GET_NEXT_SEQUENCE_VALUE(Sequence overrided_sequence_name)),"+
 			"`test` STRING(MAX),`singer_id` INT64,"+
 			"CONSTRAINT `fk_tests_singer` FOREIGN KEY (`singer_id`) REFERENCES `singers`(`id`)) "+
@@ -158,6 +164,7 @@ func TestMigrateMultipleTimes(t *testing.T) {
 	hasIndexSql := "SELECT count(*) FROM information_schema.indexes WHERE table_schema = @p1 AND table_name = @p2 AND index_name = @p3"
 
 	_ = putCountStatementResult(server, hasTableSql, 0)
+	_ = putDefaultSequenceKindResult(server, "")
 
 	err = db.Migrator().AutoMigrate(&singer{}, &album{}, &test{})
 	// Verify that the first migration worked and executed the expected number of requests.
@@ -169,7 +176,7 @@ func TestMigrateMultipleTimes(t *testing.T) {
 		t.Fatalf("request count mismatch\n Got: %v\nWant: %v", g, w)
 	}
 	request := requests[0].(*databasepb.UpdateDatabaseDdlRequest)
-	if g, w := len(request.GetStatements()), 8; g != w {
+	if g, w := len(request.GetStatements()), 7; g != w {
 		t.Fatalf("statement count mismatch\n Got: %v\nWant: %v", g, w)
 	}
 
@@ -180,6 +187,7 @@ func TestMigrateMultipleTimes(t *testing.T) {
 	_ = putSelectSingerRowResult(server, selectSingerRow)
 	_ = putSingerColDetailsResult(server, getColDetailsSql)
 	_ = putCountStatementResult(server, hasIndexSql, 1)
+	_ = putDefaultSequenceKindResult(server, "bit_reversed_positive")
 
 	err = db.Migrator().AutoMigrate(&singer{})
 	if err != nil {
@@ -191,6 +199,27 @@ func TestMigrateMultipleTimes(t *testing.T) {
 	if g, w := len(requests), 1; g != w {
 		t.Fatalf("request count mismatch\n Got: %v\nWant: %v", g, w)
 	}
+}
+
+func putDefaultSequenceKindResult(server *testutil.MockedSpannerInMemTestServer, value string) error {
+	result := &spannerpb.ResultSet{
+		Metadata: &spannerpb.ResultSetMetadata{
+			RowType: &spannerpb.StructType{
+				Fields: []*spannerpb.StructType_Field{
+					{Type: &spannerpb.Type{Code: spannerpb.TypeCode_STRING}, Name: "option_value"},
+				},
+			},
+		},
+	}
+	if value != "" {
+		result.Rows = []*structpb.ListValue{
+			{Values: []*structpb.Value{{Kind: &structpb.Value_StringValue{StringValue: value}}}},
+		}
+	}
+	return server.TestSpanner.PutStatementResult("select option_value from information_schema.database_options where schema_name=@p1 and lower(option_name)='default_sequence_kind'", &testutil.StatementResult{
+		Type:      testutil.StatementResultResultSet,
+		ResultSet: result,
+	})
 }
 
 func putCountStatementResult(server *testutil.MockedSpannerInMemTestServer, sql string, count int) error {

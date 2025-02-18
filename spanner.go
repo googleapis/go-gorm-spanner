@@ -54,6 +54,17 @@ type Config struct {
 	// if you are experiencing problems with the automatic batching of DDL
 	// statements when calling AutoMigrate.
 	DisableAutoMigrateBatching bool
+
+	// DisableSetDefaultSequenceKind turns off automatically setting a default
+	// sequence kind for the database when AutoMigrate is called. A default
+	// sequence kind is required for AutoIncrement columns.
+	// The default is set to 'bit_reversed_positive', unless a value has been
+	// set for the DefaultSequenceKind configuration option.
+	DisableSetDefaultSequenceKind bool
+	// DefaultSequenceKind is the value that will be set for the database
+	// option 'default_sequence_kind'. This configuration option defaults to
+	// 'bit_reversed_positive' if no value has been set.
+	DefaultSequenceKind string
 }
 
 type Dialector struct {
