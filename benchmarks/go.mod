@@ -7,11 +7,11 @@ toolchain go1.24.0
 replace github.com/googleapis/go-gorm-spanner => ../
 
 require (
-	cloud.google.com/go/spanner v1.75.0
+	cloud.google.com/go/spanner v1.76.1
 	github.com/google/uuid v1.6.0
-	github.com/googleapis/go-gorm-spanner v1.5.0
+	github.com/googleapis/go-gorm-spanner v1.6.0
 	github.com/googleapis/go-sql-spanner v1.11.1
-	google.golang.org/genproto v0.0.0-20250212204824-5a70512c5d8b
+	google.golang.org/genproto 55c901821b1e
 	google.golang.org/grpc v1.70.0
 	gorm.io/datatypes v1.2.5
 	gorm.io/gorm v1.25.12
