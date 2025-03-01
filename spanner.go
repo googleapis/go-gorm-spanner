@@ -54,6 +54,13 @@ type Config struct {
 	// if you are experiencing problems with the automatic batching of DDL
 	// statements when calling AutoMigrate.
 	DisableAutoMigrateBatching bool
+
+	// DefaultSequenceKind is the value that will be used for auto-generated
+	// primary keys. This configuration option defaults to 'bit_reversed_positive'
+	// if no value has been set.
+	// Set this configuration option to DISABLED to fall back to using sequences
+	// for auto-increment primary keys.
+	DefaultSequenceKind string
 }
 
 type Dialector struct {
