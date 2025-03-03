@@ -58,6 +58,12 @@ type Config struct {
 	// DefaultSequenceKind is the value that will be used for auto-generated
 	// primary keys. This configuration option defaults to 'bit_reversed_positive'
 	// if no value has been set.
+	//
+	// Set this configuration option to AUTO_INCREMENT to use the AUTO_INCREMENT
+	// keyword. The auto-generated value will then use the default_sequence_kind
+	// that is configured in the database. This returns an error if the database
+	// does not have a default_sequence_kind.
+	//
 	// Set this configuration option to DISABLED to fall back to using sequences
 	// for auto-increment primary keys.
 	DefaultSequenceKind string

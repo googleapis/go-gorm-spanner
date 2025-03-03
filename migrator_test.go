@@ -177,6 +177,55 @@ func TestCustomDefaultSequenceKind(t *testing.T) {
 	}
 }
 
+func TestAutoIncrementColumns(t *testing.T) {
+	t.Parallel()
+
+	server, _, serverTeardown := setupMockedTestServer(t)
+	db, server, teardown := setupTestGormConnectionWithDialector(t, server, serverTeardown, New(Config{
+		DriverName:          "spanner",
+		DSN:                 fmt.Sprintf("%s/projects/p/instances/i/databases/d?useplaintext=true", server.Address),
+		DefaultSequenceKind: "AUTO_INCREMENT",
+	}))
+	defer teardown()
+	anyProto, err := anypb.New(&emptypb.Empty{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server.TestDatabaseAdmin.SetResps([]proto.Message{
+		&longrunningpb.Operation{
+			Name:   "test-operation",
+			Done:   true,
+			Result: &longrunningpb.Operation_Response{Response: anyProto},
+		},
+	})
+
+	err = db.Migrator().AutoMigrate(&singer{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	requests := server.TestDatabaseAdmin.Reqs()
+	if g, w := len(requests), 1; g != w {
+		t.Fatalf("request count mismatch\n Got: %v\nWant: %v", g, w)
+	}
+	request := requests[0].(*databasepb.UpdateDatabaseDdlRequest)
+	if g, w := len(request.GetStatements()), 2; g != w {
+		t.Fatalf("statement count mismatch\n Got: %v\nWant: %v", g, w)
+	}
+	index := 0
+	if g, w := request.GetStatements()[index],
+		"CREATE TABLE `singers` ("+
+			"`id` INT64 AUTO_INCREMENT,`created_at` TIMESTAMP,`updated_at` TIMESTAMP,`deleted_at` TIMESTAMP,"+
+			"`first_name` STRING(MAX),`last_name` STRING(MAX),`full_name` STRING(MAX),`active` BOOL) "+
+			"PRIMARY KEY (`id`)"; g != w {
+		t.Fatalf("create singers statement text mismatch\n Got: %s\nWant: %s", g, w)
+	}
+	index++
+	if g, w := request.GetStatements()[index],
+		"CREATE INDEX `idx_singers_deleted_at` ON `singers`(`deleted_at`)"; g != w {
+		t.Fatalf("create idx_singers_deleted_at statement text mismatch\n Got: %s\nWant: %s", g, w)
+	}
+}
+
 func TestDisableIdentityColumns(t *testing.T) {
 	t.Parallel()
 
