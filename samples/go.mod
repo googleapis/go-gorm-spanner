@@ -9,7 +9,7 @@ replace github.com/googleapis/go-gorm-spanner => ../
 require (
 	cloud.google.com/go v0.118.3
 	cloud.google.com/go/spanner v1.77.0
-	github.com/docker/docker v27.5.1+incompatible
+	github.com/docker/docker v28.0.1+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/golang/protobuf v1.5.4
 	github.com/google/uuid v1.6.0
