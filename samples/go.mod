@@ -2,22 +2,22 @@ module github.com/googleapis/go-gorm-spanner/samples
 
 go 1.23.0
 
-toolchain go1.24.0
+toolchain go1.24.1
 
 replace github.com/googleapis/go-gorm-spanner => ../
 
 require (
 	cloud.google.com/go v0.118.3
-	cloud.google.com/go/spanner v1.76.1
+	cloud.google.com/go/spanner v1.77.0
 	github.com/docker/docker v27.5.1+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/golang/protobuf v1.5.4
 	github.com/google/uuid v1.6.0
 	github.com/googleapis/go-gorm-spanner v1.6.0
-	github.com/googleapis/go-sql-spanner v1.11.1
+	github.com/googleapis/go-sql-spanner v1.11.2
 	github.com/stretchr/testify v1.10.0
-	google.golang.org/api v0.223.0
-	google.golang.org/grpc v1.70.0
+	google.golang.org/api v0.224.0
+	google.golang.org/grpc v1.71.0
 	google.golang.org/protobuf v1.36.5
 	gorm.io/gorm v1.25.12
 )
