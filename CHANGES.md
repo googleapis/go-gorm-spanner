@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.7.0](https://github.com/googleapis/go-gorm-spanner/compare/v1.6.0...v1.7.0) (2025-03-10)
+
+
+### Features
+
+* Use IDENTITY for generated primary keys ([#150](https://github.com/googleapis/go-gorm-spanner/issues/150)) ([7e47047](https://github.com/googleapis/go-gorm-spanner/commit/7e47047f2a4ca7a9e899002dc734be70d853e7e5))
+
+
+### Performance Improvements
+
+* Use last_statement for auto-commit ([#154](https://github.com/googleapis/go-gorm-spanner/issues/154)) ([bd5a253](https://github.com/googleapis/go-gorm-spanner/commit/bd5a253d85e233d91b6cea98abdcc7742f2706c0))
+
 ## [1.6.0](https://github.com/googleapis/go-gorm-spanner/compare/v1.5.0...v1.6.0) (2025-02-17)
 
 
