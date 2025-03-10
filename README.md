@@ -123,6 +123,77 @@ for how to map and use those types:
 * Arrays: [array_data_type.go](/samples/snippets/array_data_type.go)
 * Protobuf: [protobuf_columns.go](/samples/snippets/protobuf_columns.go)
 
+## Auto-increment Primary Keys
+Columns that are marked as auto-increment in `gorm` use `IDENTITY` columns in Spanner
+by default. `IDENTITY` columns use a backing bit-reversed sequence for value generation.
+These values are guaranteed to be unique and safe to use as generated primary key values
+with Spanner. See https://cloud.google.com/spanner/docs/primary-key-default-value#identity-columns
+for more information on `IDENTITY` columns.
+
+The following model uses an `IDENTITY` column with a backing bit-reversed sequence for
+primary key values:
+
+```go
+type singer struct {
+	gorm.Model
+	Name string
+}
+```
+
+### Sequence Kind
+`IDENTITY` columns by default use a bit-reversed sequence to generate values. You can set
+the type of sequence to use in the `gorm` dialector configuration. The default and currently
+only supported value is `BIT_REVERSED_POSITIVE`.
+
+In addition, the configuration option supports two special values:
+- `DISABLED`: Disable the use of `IDENTITY` columns and use bit-reversed sequences instead. See below for more information.
+- `AUTO_INCREMENT`: Generate `AUTO_INCREMENT` columns instead of  `IDENTITY` columns. `AUTO_INCREMENT` columns use
+  the default sequence kind that has been configured in the database. See https://cloud.google.com/spanner/docs/primary-key-default-value#serial-auto-increment
+  for more information on `AUTO_INCREMENT` columns.
+
+Example:
+
+```go
+// This dialector uses AUTO_INCREMENT columns instead of IDENTITY columns.
+dialector := New(Config{
+    DriverName:          "spanner",
+    DSN:                 fmt.Sprintf("projects/my-project/instances/my-instance/databases/my-database"),
+    DefaultSequenceKind: "AUTO_INCREMENT",
+})
+```
+
+### Sequences
+You can also manually assign a sequence to be used for primary key generation for a
+model. Use the `gorm_sequence_name` tag to specify a sequence name.
+
+This model uses a sequence named `singer_sequence` for primary key generation.
+
+```go
+type singer struct {
+	ID       uint `gorm:"primarykey" gorm_sequence_name:"singer_sequence"`
+	Name     string
+}
+```
+
+You can also configure Spanner `gorm` to use sequences for to generate primary key
+values for all models. Set the `DefaultSequenceKind` in the dialector configuration
+for this:
+
+```go
+dialector := New(Config{
+    DriverName:          "spanner",
+    DSN:                 fmt.Sprintf("projects/my-project/instances/my-instance/databases/my-database"),
+    DefaultSequenceKind: "DISABLED",
+})
+
+// This model uses a bit-reversed sequence for primary key generation,
+// as DefaultSequenceKind has been set to DISABLED in the configuration.
+type singer struct {
+    gorm.Model
+    Name string
+}
+```
+
 ## AutoMigrate Dry Run
 The Spanner `gorm` dialect supports dry-runs for auto-migration. Use this to get the
 DDL statements that would be generated and executed by auto-migration. You can manually
