@@ -359,6 +359,27 @@ func TestSelectForUpdate(t *testing.T) {
 	}
 }
 
+func TestLastStatement(t *testing.T) {
+	t.Parallel()
+
+	db, server, teardown := setupTestGormConnection(t)
+	defer teardown()
+
+	s := singerWithCommitTimestamp{
+		FirstName: "First",
+		LastName:  "Last",
+	}
+	_ = putSingerResult(server, "INSERT INTO `singers` (`first_name`,`last_name`,`last_updated`,`rating`) VALUES (@p1,@p2,PENDING_COMMIT_TIMESTAMP(),@p3) THEN RETURN `id`", s)
+	// Skip default transactions to enable the use of auto commit and the last_statement optimization.
+	if err := db.Session(&gorm.Session{SkipDefaultTransaction: true}).Create(&s).Error; err != nil {
+		t.Fatalf("failed to create singer: %v", err)
+	}
+	request := getLastSqlRequest(server)
+	if !request.LastStatement {
+		t.Fatalf("last statement mismatch\n Got: %v\nWant: %v", request.LastStatement, true)
+	}
+}
+
 func filter(requests []interface{}, sql string) (ret []*spannerpb.ExecuteSqlRequest) {
 	for _, i := range requests {
 		if req, ok := i.(*spannerpb.ExecuteSqlRequest); ok {
