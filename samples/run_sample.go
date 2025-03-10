@@ -88,6 +88,8 @@ func main() {
 		emulator.RunSampleOnEmulatorWithDdl(snippets.ProtobufColumns, protoDescriptors, ddlStatements...)
 	case "data_types":
 		emulator.RunSampleOnEmulator(snippets.DataTypes)
+	case "last_statement":
+		emulator.RunSampleOnEmulatorWithDdl(snippets.LastStatement, protoDescriptors, ddlStatements...)
 	default:
 		fmt.Printf("unknown sample: %s\n", sample)
 		os.Exit(1)
