@@ -7,18 +7,18 @@ toolchain go1.24.1
 replace github.com/googleapis/go-gorm-spanner => ../
 
 require (
-	cloud.google.com/go v0.119.0
-	cloud.google.com/go/spanner v1.77.0
-	github.com/docker/docker v28.0.1+incompatible
+	cloud.google.com/go v0.120.0
+	cloud.google.com/go/spanner v1.78.0
+	github.com/docker/docker v28.0.4+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/golang/protobuf v1.5.4
 	github.com/google/uuid v1.6.0
 	github.com/googleapis/go-gorm-spanner v1.7.0
-	github.com/googleapis/go-sql-spanner v1.12.0
+	github.com/googleapis/go-sql-spanner v1.13.0
 	github.com/stretchr/testify v1.10.0
-	google.golang.org/api v0.226.0
+	google.golang.org/api v0.228.0
 	google.golang.org/grpc v1.71.0
-	google.golang.org/protobuf v1.36.5
+	google.golang.org/protobuf v1.36.6
 	gorm.io/gorm v1.25.12
 )
 
