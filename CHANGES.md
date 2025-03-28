@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.0](https://github.com/googleapis/go-gorm-spanner/compare/v1.7.0...v1.8.0) (2025-03-28)
+
+
+### Features
+
+* Isolation level repeatable read ([#159](https://github.com/googleapis/go-gorm-spanner/issues/159)) ([44fee75](https://github.com/googleapis/go-gorm-spanner/commit/44fee75b8888b137ed8b64c01c8f1300c6450501))
+
 ## [1.7.0](https://github.com/googleapis/go-gorm-spanner/compare/v1.6.0...v1.7.0) (2025-03-10)
 
 
