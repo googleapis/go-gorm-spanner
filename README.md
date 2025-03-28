@@ -43,6 +43,7 @@ The Cloud Spanner GORM supports the following connection URL properties
 #### Commonly Used Properties
 - credentials (String): File name for the credentials to use. The connection will use the default credentials of the environment if no credentials file is specified in the connection string. Example: `projects/my-project/instances/my-instance/databases/my-db;credentials=/path/to/credentials.json`
 - optimizerVersion (String): Sets the default query optimizer version to use for this connection. See also https://cloud.google.com/spanner/docs/query-optimizer/query-optimizer-versions.
+- isolationLevel (String): Sets the default isolation level for read/write transaction. The default is `sql.LevelSerializable`. Other supported values are `sql.LevelRepeatableRead`. Example: `fmt.Sprintf("projects/my-project/instances/my-instance/databases/my-db;isolationLevel=%s", sql.LevelRepeatableRead)`
 
 #### Advanced Properties
 - minSessions (int): Sets the minimum number of sessions in the backing session pool. Defaults to 100.
@@ -229,10 +230,6 @@ For the complete list of the limitations, see the [Spanner GORM limitations](/do
 ### Nested Transactions
 `gorm` uses savepoints for nested transactions. Savepoints are currently not supported by Cloud Spanner. Nested
 transactions can therefore not be used with GORM.
-
-### Locking
-Locking clauses, like `clause.Locking{Strength: "UPDATE"}`, are not supported. These are generally speaking also not
-required, as Cloud Spanner uses isolation level `serializable` for read/write transactions.
 
 ## Authorization
 
