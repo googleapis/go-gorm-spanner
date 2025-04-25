@@ -2,19 +2,19 @@ module github.com/googleapis/go-gorm-spanner/benchmarks
 
 go 1.23.0
 
-toolchain go1.24.1
+toolchain go1.24.2
 
 replace github.com/googleapis/go-gorm-spanner => ../
 
 require (
-	cloud.google.com/go/spanner v1.77.0
+	cloud.google.com/go/spanner v1.80.0
 	github.com/google/uuid v1.6.0
-	github.com/googleapis/go-gorm-spanner v1.7.0
+	github.com/googleapis/go-gorm-spanner v1.8.0
 	github.com/googleapis/go-sql-spanner v1.13.0
-	google.golang.org/genproto v0.0.0-20250324211829-b45e905df463
-	google.golang.org/grpc v1.71.0
+	google.golang.org/genproto 7b384671a197
+	google.golang.org/grpc v1.72.0
 	gorm.io/datatypes v1.2.5
-	gorm.io/gorm v1.25.12
+	gorm.io/gorm v1.26.0
 )
 
 require (
