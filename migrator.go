@@ -205,13 +205,15 @@ func (m spannerMigrator) CreateTable(values ...interface{}) error {
 			// inline index creation. Iterate over the indexes in a fixed order to make the
 			// script outcome deterministic.
 			indexes := stmt.Schema.ParseIndexes()
+			indexesMap := map[string]*schema.Index{}
 			indexNames := make([]string, 0, len(indexes))
-			for name := range indexes {
-				indexNames = append(indexNames, name)
+			for _, index := range indexes {
+				indexesMap[index.Name] = index
+				indexNames = append(indexNames, index.Name)
 			}
 			slices.Sort(indexNames)
 			for _, name := range indexNames {
-				idx := indexes[name]
+				idx := indexesMap[name]
 				defer func(value interface{}, name string) {
 					if errr == nil {
 						errr = tx.Migrator().CreateIndex(value, name)
