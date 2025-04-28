@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.1](https://github.com/googleapis/go-gorm-spanner/compare/v1.8.0...v1.8.1) (2025-04-28)
+
+
+### Performance Improvements
+
+* Skip gRPC trailers for queries ([#166](https://github.com/googleapis/go-gorm-spanner/issues/166)) ([faa75dd](https://github.com/googleapis/go-gorm-spanner/commit/faa75ddcb2600cd8a62348893dce54a3ed93628c))
+
 ## [1.8.0](https://github.com/googleapis/go-gorm-spanner/compare/v1.7.0...v1.8.0) (2025-03-28)
 
 
