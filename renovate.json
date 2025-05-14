@@ -1,18 +1,15 @@
 {
   "extends": [
     "config:base",
-    "schedule:weekly",
-    ":disableDependencyDashboard",
+    "schedule:daily",
     "docker:disable"
   ],
-  "semanticCommits": false,
+  "semanticCommits": "enabled",
+  "semanticCommitType": "deps",
+  "semanticCommitScope": "",
   "postUpdateOptions": [
     "gomodTidy"
   ],
-  "commitMessagePrefix": "chore: ",
   "commitMessageAction": "update",
-  "groupName": "deps",
-  "constraints": {
-      "go": "1.23"
-  }
+  "groupName": "all dependencies"
 }
