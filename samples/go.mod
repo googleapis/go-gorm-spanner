@@ -8,16 +8,16 @@ replace github.com/googleapis/go-gorm-spanner => ../
 
 require (
 	cloud.google.com/go v0.121.1
-	cloud.google.com/go/spanner v1.81.0
+	cloud.google.com/go/spanner v1.81.1
 	github.com/docker/docker v28.1.1+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/golang/protobuf v1.5.4
 	github.com/google/uuid v1.6.0
-	github.com/googleapis/go-gorm-spanner v1.8.1
+	github.com/googleapis/go-gorm-spanner v1.8.2
 	github.com/googleapis/go-sql-spanner v1.13.2
 	github.com/stretchr/testify v1.10.0
 	google.golang.org/api v0.233.0
-	google.golang.org/grpc v1.72.0
+	google.golang.org/grpc v1.72.1
 	google.golang.org/protobuf v1.36.6
 	gorm.io/gorm v1.26.1
 )
