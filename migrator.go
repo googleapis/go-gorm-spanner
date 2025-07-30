@@ -470,6 +470,9 @@ func (m spannerMigrator) ColumnTypes(value interface{}) ([]gorm.ColumnType, erro
 
 			columnTypes = append(columnTypes, column)
 		}
+		if err := columns.Err(); err != nil {
+			return err
+		}
 
 		return nil
 	})
