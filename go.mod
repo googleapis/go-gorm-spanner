@@ -14,7 +14,7 @@ require (
 	github.com/googleapis/go-sql-spanner v1.16.1
 	github.com/shopspring/decimal v1.4.0
 	github.com/stretchr/testify v1.10.0
-	google.golang.org/api v0.243.0
+	google.golang.org/api v0.244.0
 	google.golang.org/grpc v1.74.2
 	google.golang.org/protobuf v1.36.6
 	gorm.io/datatypes v1.2.6
