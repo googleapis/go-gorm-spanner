@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.4](https://github.com/googleapis/go-gorm-spanner/compare/v1.8.3...v1.8.4) (2025-08-05)
+
+
+### Bug Fixes
+
+* Update all dependencies ([#179](https://github.com/googleapis/go-gorm-spanner/issues/179)) ([ce25d99](https://github.com/googleapis/go-gorm-spanner/commit/ce25d99fa9b937c245f0562d9baf7946cde17b2f))
+
 ## [1.8.3](https://github.com/googleapis/go-gorm-spanner/compare/v1.8.2...v1.8.3) (2025-07-30)
 
 
