@@ -526,8 +526,8 @@ cloud.google.com/go/shell v1.6.0/go.mod h1:oHO8QACS90luWgxP3N9iZVuEiSF84zNyLytb+
 cloud.google.com/go/spanner v1.41.0/go.mod h1:MLYDBJR/dY4Wt7ZaMIQ7rXOTLjYrmxLE/5ve9vFfWos=
 cloud.google.com/go/spanner v1.44.0/go.mod h1:G8XIgYdOK+Fbcpbs7p2fiprDw4CaZX63whnSMLVBxjk=
 cloud.google.com/go/spanner v1.45.0/go.mod h1:FIws5LowYz8YAE1J8fOS7DJup8ff7xJeetWEo5REA2M=
-cloud.google.com/go/spanner v1.84.0 h1:McPTc6g7hmZfvBlY2mwxl4nJ3+oVtDOl3yGvxIyDTKk=
-cloud.google.com/go/spanner v1.84.0/go.mod h1:Klo9oQcfxr32vh+2iuA34c6rHjjSpMcU23Jy6DArz7I=
+cloud.google.com/go/spanner v1.84.1 h1:ShH4Y3YeDtmHa55dFiSS3YtQ0dmCuP0okfAoHp/d68w=
+cloud.google.com/go/spanner v1.84.1/go.mod h1:3GMEIjOcXINJSvb42H3M6TdlGCDzaCFpiiNQpjHPlCM=
 cloud.google.com/go/speech v1.6.0/go.mod h1:79tcr4FHCimOp56lwC01xnt/WPJZc4v3gzyT7FoBkCM=
 cloud.google.com/go/speech v1.7.0/go.mod h1:KptqL+BAQIhMsj1kOP2la5DSEEerPDuOP/2mmkhHhZQ=
 cloud.google.com/go/speech v1.8.0/go.mod h1:9bYIl1/tjsAnMgKGHKmBZzXKEkGgtU+MpdDPTE9f7y0=
@@ -849,8 +849,8 @@ github.com/googleapis/gax-go/v2 v2.7.0/go.mod h1:TEop28CZZQ2y+c0VxMUmu1lV+fQx57Q
 github.com/googleapis/gax-go/v2 v2.7.1/go.mod h1:4orTrqY6hXxxaUL4LHIPl6lGo8vAE38/qKbhSAKP6QI=
 github.com/googleapis/gax-go/v2 v2.15.0 h1:SyjDc1mGgZU5LncH8gimWo9lW1DtIfPibOG81vgd/bo=
 github.com/googleapis/gax-go/v2 v2.15.0/go.mod h1:zVVkkxAQHa1RQpg9z2AUCMnKhi0Qld9rcmyfL1OZhoc=
-github.com/googleapis/go-sql-spanner v1.16.2 h1:FwVEmxNKI6szYHBYCbHHe6o2EQD+4PVbf0uM2uxY2gU=
-github.com/googleapis/go-sql-spanner v1.16.2/go.mod h1:N6/0COAutQFmMNPLAz76H6/+yDmV0iw/DyCNm8O0nqQ=
+github.com/googleapis/go-sql-spanner v1.16.3 h1:VgtvMm5n4KHjH+lHmi6YYjPskCYwArL+7hKGHZj3Cgc=
+github.com/googleapis/go-sql-spanner v1.16.3/go.mod h1:w0fc5/oE1/CQJLiZi9gqEWdL7IMjgJmkvkxjRuCMMZY=
 github.com/googleapis/go-type-adapters v1.0.0/go.mod h1:zHW75FOG2aur7gAO2B+MLby+cLsWGBF62rFAi7WjWO4=
 github.com/googleapis/google-cloud-go-testing v0.0.0-20200911160855-bcd43fbb19e8/go.mod h1:dvDLG8qkwmyD9a/MJJN3XJcT3xFxOKAvTZGvuZmac9g=
 github.com/grpc-ecosystem/grpc-gateway v1.16.0 h1:gmcG1KaJ57LophUzW0Hy8NmPhnMZb4M0+kPpLofRdBo=
@@ -1437,8 +1437,8 @@ google.golang.org/api v0.108.0/go.mod h1:2Ts0XTHNVWxypznxWOYUeI4g3WdP9Pk2Qk58+a/
 google.golang.org/api v0.110.0/go.mod h1:7FC4Vvx1Mooxh8C5HWjzZHcavuS2f6pmJpZx60ca7iI=
 google.golang.org/api v0.111.0/go.mod h1:qtFHvU9mhgTJegR31csQ+rwxyUTHOKFqCKWp1J0fdw0=
 google.golang.org/api v0.114.0/go.mod h1:ifYI2ZsFK6/uGddGfAD5BMxlnkBqCmqHSDUVi45N5Yg=
-google.golang.org/api v0.244.0 h1:lpkP8wVibSKr++NCD36XzTk/IzeKJ3klj7vbj+XU5pE=
-google.golang.org/api v0.244.0/go.mod h1:dMVhVcylamkirHdzEBAIQWUCgqY885ivNeZYd7VAVr8=
+google.golang.org/api v0.246.0 h1:H0ODDs5PnMZVZAEtdLMn2Ul2eQi7QNjqM2DIFp8TlTM=
+google.golang.org/api v0.246.0/go.mod h1:dMVhVcylamkirHdzEBAIQWUCgqY885ivNeZYd7VAVr8=
 google.golang.org/appengine v1.1.0/go.mod h1:EbEs0AVv82hx2wNQdGPgUI5lhzA/G0D9YwlJXL52JkM=
 google.golang.org/appengine v1.4.0/go.mod h1:xpcJRLb0r/rnEns0DIKYYv+WjYCduHsrkT7/EB5XEv4=
 google.golang.org/appengine v1.5.0/go.mod h1:xpcJRLb0r/rnEns0DIKYYv+WjYCduHsrkT7/EB5XEv4=
