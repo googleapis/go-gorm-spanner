@@ -7,14 +7,14 @@ toolchain go1.24.5
 require (
 	cloud.google.com/go v0.121.4
 	cloud.google.com/go/longrunning v0.6.7
-	cloud.google.com/go/spanner v1.84.0
+	cloud.google.com/go/spanner v1.84.1
 	github.com/golang/protobuf v1.5.4
 	github.com/google/go-cmp v0.7.0
 	github.com/googleapis/gax-go/v2 v2.15.0
-	github.com/googleapis/go-sql-spanner v1.16.2
+	github.com/googleapis/go-sql-spanner v1.16.3
 	github.com/shopspring/decimal v1.4.0
 	github.com/stretchr/testify v1.10.0
-	google.golang.org/api v0.244.0
+	google.golang.org/api v0.246.0
 	google.golang.org/grpc v1.74.2
 	google.golang.org/protobuf v1.36.6
 	gorm.io/datatypes v1.2.6
