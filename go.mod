@@ -2,7 +2,7 @@ module github.com/googleapis/go-gorm-spanner
 
 go 1.24
 
-toolchain go1.24.5
+toolchain go1.24.6
 
 require (
 	cloud.google.com/go v0.121.4
@@ -16,7 +16,7 @@ require (
 	github.com/stretchr/testify v1.10.0
 	google.golang.org/api v0.246.0
 	google.golang.org/grpc v1.74.2
-	google.golang.org/protobuf v1.36.6
+	google.golang.org/protobuf v1.36.7
 	gorm.io/datatypes v1.2.6
 	gorm.io/gorm v1.30.1
 )
