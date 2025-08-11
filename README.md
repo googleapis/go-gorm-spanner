@@ -94,11 +94,8 @@ $ export SPANNER_EMULATOR_HOST=localhost:9010
 
 ## [Go Versions Supported](#supported-versions)
 
-Our libraries are compatible with at least the three most recent, major Go
-releases. They are currently compatible with:
-
-- Go 1.23
-- Go 1.22
+The Spanner gorm dialect follows the [Go release policy](https://go.dev/doc/devel/release)
+and supports the two latest major Go versions.
 
 ## Data Types
 Spanner supports the following data types in combination with `gorm`.
