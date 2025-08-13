@@ -19,7 +19,7 @@ jobs:
         with:
           go-version: 1.24.x
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Run integration tests on Emulator
         run: go test -v
         env:
