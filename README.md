@@ -45,15 +45,19 @@ The Cloud Spanner GORM supports the following connection URL properties
 - optimizerVersion (String): Sets the default query optimizer version to use for this connection. See also https://cloud.google.com/spanner/docs/query-optimizer/query-optimizer-versions.
 - isolationLevel (String): Sets the default isolation level for read/write transaction. The default is `sql.LevelSerializable`. Other supported values are `sql.LevelRepeatableRead`. Example: `fmt.Sprintf("projects/my-project/instances/my-instance/databases/my-db;isolationLevel=%s", sql.LevelRepeatableRead)`
 
+Note that Spanner `gorm` uses a single multiplexed session for all operations from version 1.9.0 and higher. Multiplexed
+sessions can handle any number of concurrent queries and transactions. This means that there is no need to configure the
+minimum and maximum number of sessions for `gorm`.
+
+See https://cloud.google.com/spanner/docs/sessions#multiplexed_sessions for more information about multiplexed sessions.
+
 #### Advanced Properties
-- minSessions (int): Sets the minimum number of sessions in the backing session pool. Defaults to 100.
-- maxSessions (int): Sets the maximum number of sessions in the backing session pool. Defaults to 400.
 - numChannels (int): Sets the number of gRPC channels to use. Defaults to 4.
 - retryAbortsInternally (boolean): Boolean that indicates whether the connection should automatically retry aborted errors. The default is true.
 - disableRouteToLeader (boolean): Boolean that indicates if all the requests of type read-write and PDML need to be routed to the leader region. The default is false.
 - usePlainText (boolean): : Boolean that indicates whether the connection should use plain text communication or not. Set this to true to connect to local mock servers that do not use SSL. Example: `projects/test-project/instances/test-instance/databases/test-db;usePlainText=true`
 
-Example: `projects/my-project/instances/my-instance/databases/my-db;minSessions=100;maxSessions=400;numChannels=4;retryAbortsInternally=true;disableRouteToLeader=false;usePlainText=false`
+Example: `projects/my-project/instances/my-instance/databases/my-db;numChannels=4;retryAbortsInternally=true;disableRouteToLeader=false;usePlainText=false`
 
 #### Additional Spanner Configuration
 You can also connect `gorm` to Spanner using a `driver.Connector`. This allows you to supply additional configuration
