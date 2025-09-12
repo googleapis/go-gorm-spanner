@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.9.0](https://github.com/googleapis/go-gorm-spanner/compare/v1.8.6...v1.9.0) (2025-09-12)
+
+
+### Features
+
+* Use multiplexed sessions ([#189](https://github.com/googleapis/go-gorm-spanner/issues/189)) ([1130710](https://github.com/googleapis/go-gorm-spanner/commit/11307103f63534342dd7ad552e5d5921f417e8da))
+
+
+### Bug Fixes
+
+* Update all dependencies ([#186](https://github.com/googleapis/go-gorm-spanner/issues/186)) ([72d8a48](https://github.com/googleapis/go-gorm-spanner/commit/72d8a488457dd118f659a13b52a768d3c5073476))
+
 ## [1.8.6](https://github.com/googleapis/go-gorm-spanner/compare/v1.8.5...v1.8.6) (2025-08-18)
 
 
