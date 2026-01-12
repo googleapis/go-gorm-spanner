@@ -33,7 +33,7 @@ jobs:
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
       - name: Run integration tests on production
-        run: go test -v -timeout 45m ./... -run '^TestIntegration_'
+        run: go test -v -timeout 45m -run '^TestIntegration_'
         env:
           JOB_TYPE: test
           SPANNER_TEST_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
@@ -42,7 +42,7 @@ jobs:
         working-directory: ./samples/sample_application
         run: |
           go mod tidy
-          go test -v -timeout 45m ./... -run '^TestIntegration_'
+          go test -v -timeout 45m -run '^TestIntegration_'
         env:
           JOB_TYPE: test
           SPANNER_TEST_PROJECT: ${{ secrets.GCP_PROJECT_ID }}

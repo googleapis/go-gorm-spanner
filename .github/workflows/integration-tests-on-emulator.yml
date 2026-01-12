@@ -24,3 +24,13 @@ jobs:
         run: go test -v
         env:
           SPANNER_EMULATOR_HOST: localhost:9010
+      - name: Run PostgreSQL integration tests on Emulator
+        run: go test -v
+        working-directory: postgresql
+        env:
+          SPANNER_EMULATOR_HOST: localhost:9010
+      - name: Run PostgreSQL sample application integration tests on Emulator
+        run: go test -v
+        working-directory: postgresql/samples/sample_application
+        env:
+          SPANNER_EMULATOR_HOST: localhost:9010

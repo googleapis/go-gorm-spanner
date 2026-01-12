@@ -30,6 +30,8 @@ import (
 
 // RunTransaction executes a transaction on Spanner using the given
 // gorm database, and retries the transaction if it is aborted by Spanner.
+//
+// This function can be used for both GoogleSQL-dialect and PostgreSQL-dialect databases.
 func RunTransaction(ctx context.Context, db *gorm.DB, fc func(tx *gorm.DB) error, opts ...*sql.TxOptions) error {
 	// Disable internal (checksum-based) retries on the Spanner database/SQL connection.
 	// Note: gorm also only uses the first option, so it is safe to pick just the first element in the slice.

@@ -19,9 +19,11 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"os"
 	"time"
 
+	"cloud.google.com/go/spanner"
 	database "cloud.google.com/go/spanner/admin/database/apiv1"
 	databasepb "cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
 	instance "cloud.google.com/go/spanner/admin/instance/apiv1"
@@ -30,42 +32,78 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
+	"google.golang.org/grpc/codes"
 )
 
 var cli *client.Client
 var containerId string
 
 // RunSampleOnEmulator will run a sample function against a Spanner emulator instance in a Docker container.
-// It requires Docker to be installed your local system to work.
+// It requires Docker to be installed your local system or that the Spanner Emulator is already running.
 //
 // It will execute the following steps:
 // 1. Start a Spanner emulator in a Docker container.
 // 2. Create a sample instance and database on the emulator.
 // 3. Execute the sample function against the emulator.
 // 4. Stop the Docker container with the emulator.
-func RunSampleOnEmulator(sample func(string, string, string) error) {
-	RunSampleOnEmulatorWithDdl(sample, nil)
+func RunSampleOnEmulator(dialect databasepb.DatabaseDialect, sample func(string, string, string) error) {
+	RunSampleOnEmulatorWithDdl(dialect, sample, nil)
 }
 
-func RunSampleOnEmulatorWithDdl(sample func(string, string, string) error, protoDescriptors []byte, ddlStatements ...string) {
+func RunSampleOnEmulatorWithDdl(dialect databasepb.DatabaseDialect, sample func(string, string, string) error, protoDescriptors []byte, ddlStatements ...string) {
 	var err error
-	if _, _, err = startEmulator(); err != nil {
-		log.Fatalf("failed to start emulator: %v", err)
+	running, address := isEmulatorRunning()
+	if !running {
+		if _, _, err = startEmulator(); err != nil {
+			log.Fatalf("failed to start emulator: %v", err)
+		}
+	} else {
+		_ = os.Setenv("SPANNER_EMULATOR_HOST", address)
 	}
 	projectId, instanceId, databaseId := "my-project", "my-instance", "my-database"
-	if err = createInstance(projectId, instanceId); err != nil {
-		stopEmulator()
-		log.Fatalf("failed to create instance on emulator: %v", err)
+	if dialect == databasepb.DatabaseDialect_POSTGRESQL {
+		databaseId = "my-pg-database"
 	}
-	if err = createSampleDB(projectId, instanceId, databaseId, protoDescriptors, ddlStatements...); err != nil {
-		stopEmulator()
-		log.Fatalf("failed to create database on emulator: %v", err)
+	if err = createInstance(projectId, instanceId); err != nil {
+		if spanner.ErrCode(err) == codes.AlreadyExists && running {
+			// ignore
+		} else {
+			stopEmulator()
+			log.Fatalf("failed to create instance on emulator: %v", err)
+		}
+	}
+	if err = createSampleDB(dialect, projectId, instanceId, databaseId, protoDescriptors, ddlStatements...); err != nil {
+		if spanner.ErrCode(err) == codes.AlreadyExists && running {
+			// ignore
+		} else {
+			stopEmulator()
+			log.Fatalf("failed to create database on emulator: %v", err)
+		}
 	}
 	err = sample(projectId, instanceId, databaseId)
-	stopEmulator()
+	if !running {
+		stopEmulator()
+	}
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func isEmulatorRunning() (isRunning bool, address string) {
+	address = "localhost:9010"
+	if os.Getenv("SPANNER_EMULATOR_HOST") != "" {
+		address = os.Getenv("SPANNER_EMULATOR_HOST")
+	}
+	addr, err := net.ResolveTCPAddr("tcp", address)
+	if err != nil {
+		return false, ""
+	}
+	conn, err := net.DialTCP("tcp", nil, addr)
+	if err != nil {
+		return false, ""
+	}
+	_ = conn.Close()
+	return true, address
 }
 
 func startEmulator() (host, port string, err error) {
@@ -143,26 +181,36 @@ func createInstance(projectId, instanceId string) error {
 		},
 	})
 	if err != nil {
-		return fmt.Errorf("could not create instance %s: %v", fmt.Sprintf("projects/%s/instances/%s", projectId, instanceId), err)
+		return err
 	}
 	// Wait for the instance creation to finish.
 	if _, err := op.Wait(ctx); err != nil {
-		return fmt.Errorf("waiting for instance creation to finish failed: %v", err)
+		return err
 	}
 	return nil
 }
 
-func createSampleDB(projectId, instanceId, databaseId string, protoDescriptors []byte, statements ...string) error {
+func createSampleDB(dialect databasepb.DatabaseDialect, projectId, instanceId, databaseId string, protoDescriptors []byte, statements ...string) error {
 	ctx := context.Background()
 	databaseAdminClient, err := database.NewDatabaseAdminClient(ctx)
 	if err != nil {
 		return err
 	}
 	defer databaseAdminClient.Close()
+	var createStatement string
+	var extraStatements []string
+	if dialect == databasepb.DatabaseDialect_POSTGRESQL {
+		createStatement = fmt.Sprintf(`CREATE DATABASE "%s"`, databaseId)
+		extraStatements = nil
+	} else {
+		createStatement = fmt.Sprintf("CREATE DATABASE `%s`", databaseId)
+		extraStatements = statements
+	}
 	opDB, err := databaseAdminClient.CreateDatabase(ctx, &databasepb.CreateDatabaseRequest{
 		Parent:           fmt.Sprintf("projects/%s/instances/%s", projectId, instanceId),
-		CreateStatement:  fmt.Sprintf("CREATE DATABASE `%s`", databaseId),
-		ExtraStatements:  statements,
+		CreateStatement:  createStatement,
+		DatabaseDialect:  dialect,
+		ExtraStatements:  extraStatements,
 		ProtoDescriptors: protoDescriptors,
 	})
 	if err != nil {
@@ -170,7 +218,22 @@ func createSampleDB(projectId, instanceId, databaseId string, protoDescriptors [
 	}
 	// Wait for the database creation to finish.
 	if _, err := opDB.Wait(ctx); err != nil {
-		return fmt.Errorf("waiting for database creation to finish failed: %v", err)
+		return err
+	}
+	// Execute any additional DDL statements after the database has been created if the dialect is PostgreSQL.
+	if dialect == databasepb.DatabaseDialect_POSTGRESQL && len(statements) > 0 {
+		op, err := databaseAdminClient.UpdateDatabaseDdl(ctx, &databasepb.UpdateDatabaseDdlRequest{
+			Database:         fmt.Sprintf("projects/%s/instances/%s/databases/%s", projectId, instanceId, databaseId),
+			Statements:       statements,
+			ProtoDescriptors: protoDescriptors,
+		})
+		if err != nil {
+			return err
+		}
+		// Wait for the DDL operation to finish.
+		if err := op.Wait(ctx); err != nil {
+			return err
+		}
 	}
 	return nil
 }

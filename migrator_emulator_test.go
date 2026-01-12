@@ -133,7 +133,7 @@ func TestAutoMigrate_CreateDataModel(t *testing.T) {
 	skipIfShortOrNotEmulator(t)
 	t.Parallel()
 
-	dsn, cleanup, err := testutil.CreateTestDB(context.Background())
+	dsn, cleanup, err := testutil.CreateTestDB(context.Background(), databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL)
 	if err != nil {
 		log.Fatalf("could not init integration tests while creating database: %v", err)
 	}
@@ -295,7 +295,7 @@ func TestMigrateMultipleTimesUniqueIndexSameFieldName(t *testing.T) {
 	skipIfShortOrNotEmulator(t)
 	t.Parallel()
 
-	dsn, cleanup, err := testutil.CreateTestDB(context.Background())
+	dsn, cleanup, err := testutil.CreateTestDB(context.Background(), databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL)
 	if err != nil {
 		log.Fatalf("could not init integration tests while creating database: %v", err)
 	}
@@ -342,7 +342,7 @@ func TestMigrateMultipleTimesUniqueIndex(t *testing.T) {
 	skipIfShortOrNotEmulator(t)
 	t.Parallel()
 
-	dsn, cleanup, err := testutil.CreateTestDB(context.Background())
+	dsn, cleanup, err := testutil.CreateTestDB(context.Background(), databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL)
 	if err != nil {
 		log.Fatalf("could not init integration tests while creating database: %v", err)
 	}
@@ -375,7 +375,7 @@ func TestMigrateUniqueFieldFails(t *testing.T) {
 	skipIfShortOrNotEmulator(t)
 	t.Parallel()
 
-	dsn, cleanup, err := testutil.CreateTestDB(context.Background())
+	dsn, cleanup, err := testutil.CreateTestDB(context.Background(), databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL)
 	if err != nil {
 		log.Fatalf("could not init integration tests while creating database: %v", err)
 	}
@@ -408,7 +408,7 @@ func TestMigrateAllTypes(t *testing.T) {
 	skipIfShortOrNotEmulator(t)
 	t.Parallel()
 
-	dsn, cleanup, err := testutil.CreateTestDB(context.Background())
+	dsn, cleanup, err := testutil.CreateTestDB(context.Background(), databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL)
 	if err != nil {
 		log.Fatalf("could not init integration tests while creating database: %v", err)
 	}

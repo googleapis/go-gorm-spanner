@@ -34,6 +34,10 @@ import (
 // or if the generated data model for example contains more secondary
 // indexes than you actually want in your database.
 //
+// gorm Migrations are only recommended for development processes.
+// Schema changes in a production environment should be applied using
+// a more controlled method, like a schema management tool.
+//
 // Execute the sample with the command `go run run_sample.go migrations`
 // from the samples directory.
 func Migrations(projectId, instanceId, databaseId string) error {

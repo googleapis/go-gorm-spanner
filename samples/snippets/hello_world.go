@@ -15,7 +15,6 @@
 package snippets
 
 import (
-	"errors"
 	"fmt"
 
 	spannergorm "github.com/googleapis/go-gorm-spanner"
@@ -34,17 +33,11 @@ func HelloWorld(projectId, instanceId, databaseId string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open database connection: %v\n", err)
 	}
-	var msg []string
+	var msg string
 	if err := db.Raw("SELECT 'Hello World!'").Scan(&msg).Error; err != nil {
-		return fmt.Errorf("failed to execute query: %v", err)
+		return fmt.Errorf("failed to execute query: %w", err)
 	}
-
-	if len(msg) == 0 {
-		return errors.New("failed to execute query")
-	}
-	for _, m := range msg {
-		fmt.Printf("%s\n", m)
-	}
+	fmt.Println(msg)
 
 	return nil
 }

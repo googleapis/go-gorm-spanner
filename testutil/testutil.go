@@ -101,14 +101,19 @@ func initTestInstance(config string) (cleanup func(), err error) {
 	// Delete the instance after all tests have finished.
 	// Also delete any stale test instances that might still be around on the project.
 	return func() {
+		log.Println("Starting instance cleanup")
 		instanceAdmin, err := instance.NewInstanceAdminClient(ctx)
 		if err != nil {
 			return
 		}
 		// Delete this test instance.
-		instanceAdmin.DeleteInstance(ctx, &instancepb.DeleteInstanceRequest{
+		log.Printf("Deleting instance %s", instanceId)
+		if err := instanceAdmin.DeleteInstance(ctx, &instancepb.DeleteInstanceRequest{
 			Name: fmt.Sprintf("projects/%s/instances/%s", projectId, instanceId),
-		})
+		}); err != nil {
+			log.Printf("Failed to delete instance %s: %v", instanceId, err)
+		}
+		log.Println("Deleting stale test instances")
 		// Also delete any other stale test instance.
 		instances := instanceAdmin.ListInstances(ctx, &instancepb.ListInstancesRequest{
 			Parent: fmt.Sprintf("projects/%s", projectId),
@@ -132,9 +137,11 @@ func initTestInstance(config string) (cleanup func(), err error) {
 					diff := time.Duration(time.Now().Unix()-seconds) * time.Second
 					if diff > time.Hour*2 {
 						log.Printf("deleting stale test instance %s", instance.Name)
-						instanceAdmin.DeleteInstance(ctx, &instancepb.DeleteInstanceRequest{
+						if err := instanceAdmin.DeleteInstance(ctx, &instancepb.DeleteInstanceRequest{
 							Name: instance.Name,
-						})
+						}); err != nil {
+							log.Printf("failed to delete stale test instance %s: %v", instance.Name, err)
+						}
 					}
 				}
 			}
@@ -142,7 +149,7 @@ func initTestInstance(config string) (cleanup func(), err error) {
 	}, nil
 }
 
-func CreateTestDB(ctx context.Context, statements ...string) (dsn string, cleanup func(), err error) {
+func CreateTestDB(ctx context.Context, dialect databasepb.DatabaseDialect, statements ...string) (dsn string, cleanup func(), err error) {
 	databaseAdminClient, err := database.NewDatabaseAdminClient(ctx)
 	if err != nil {
 		return "", nil, err
@@ -154,9 +161,17 @@ func CreateTestDB(ctx context.Context, statements ...string) (dsn string, cleanu
 	}
 	currentTime := time.Now().UnixNano()
 	databaseId := fmt.Sprintf("%s-%d", prefix, currentTime)
+	createStatement := fmt.Sprintf("CREATE DATABASE `%s`", databaseId)
+	var afterStatements []string
+	if dialect == databasepb.DatabaseDialect_POSTGRESQL {
+		createStatement = fmt.Sprintf(`CREATE DATABASE "%s"`, databaseId)
+		afterStatements = statements
+		statements = nil
+	}
 	opdb, err := databaseAdminClient.CreateDatabase(ctx, &databasepb.CreateDatabaseRequest{
 		Parent:          fmt.Sprintf("projects/%s/instances/%s", projectId, instanceId),
-		CreateStatement: fmt.Sprintf("CREATE DATABASE `%s`", databaseId),
+		DatabaseDialect: dialect,
+		CreateStatement: createStatement,
 		ExtraStatements: statements,
 	})
 	if err != nil {
@@ -168,6 +183,20 @@ func CreateTestDB(ctx context.Context, statements ...string) (dsn string, cleanu
 			return "", nil, fmt.Errorf("waiting for database creation to finish failed: %v", err)
 		}
 	}
+	if afterStatements != nil {
+		op, err := databaseAdminClient.UpdateDatabaseDdl(ctx, &databasepb.UpdateDatabaseDdlRequest{
+			Database:   fmt.Sprintf("projects/%s/instances/%s/databases/%s", projectId, instanceId, databaseId),
+			Statements: afterStatements,
+		})
+		if err != nil {
+			return "", nil, err
+		}
+		if err := op.Wait(ctx); err != nil {
+			return "", nil, fmt.Errorf("waiting for database update to finish failed: %w", err)
+		}
+	}
+
+	//dsn = "projects/" + projectId + "/instances/" + instanceId + "/databases/" + databaseId + "?decode_numeric_to_string=true"
 	dsn = "projects/" + projectId + "/instances/" + instanceId + "/databases/" + databaseId
 	cleanup = func() {
 		databaseAdminClient, err := database.NewDatabaseAdminClient(ctx)

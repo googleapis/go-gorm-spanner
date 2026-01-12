@@ -20,6 +20,7 @@ import (
 	"os"
 	"strings"
 
+	"cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
 	"github.com/googleapis/go-gorm-spanner/samples/emulator"
 	samples "github.com/googleapis/go-gorm-spanner/samples/sample_application"
 	"github.com/googleapis/go-gorm-spanner/samples/snippets"
@@ -34,7 +35,7 @@ var protoDescriptors []byte
 func main() {
 	// Run the larger sample application.
 	if len(os.Args) == 1 {
-		emulator.RunSampleOnEmulator(func(project string, instance string, database string) error {
+		emulator.RunSampleOnEmulator(databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL, func(project string, instance string, database string) error {
 			return samples.RunSample(os.Stdout, "projects/"+project+"/instances/"+instance+"/databases/"+database)
 		})
 		return
@@ -51,47 +52,47 @@ func main() {
 
 	switch sample {
 	case "hello_world":
-		emulator.RunSampleOnEmulatorWithDdl(snippets.HelloWorld, protoDescriptors, ddlStatements...)
+		emulator.RunSampleOnEmulatorWithDdl(databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL, snippets.HelloWorld, protoDescriptors, ddlStatements...)
 	case "insert_data":
-		emulator.RunSampleOnEmulatorWithDdl(snippets.InsertData, protoDescriptors, ddlStatements...)
+		emulator.RunSampleOnEmulatorWithDdl(databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL, snippets.InsertData, protoDescriptors, ddlStatements...)
 	case "upsert":
-		emulator.RunSampleOnEmulatorWithDdl(snippets.Upsert, protoDescriptors, ddlStatements...)
+		emulator.RunSampleOnEmulatorWithDdl(databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL, snippets.Upsert, protoDescriptors, ddlStatements...)
 	case "batch_insert":
-		emulator.RunSampleOnEmulatorWithDdl(snippets.CreateInBatches, protoDescriptors, ddlStatements...)
+		emulator.RunSampleOnEmulatorWithDdl(databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL, snippets.CreateInBatches, protoDescriptors, ddlStatements...)
 	case "find_in_batches":
-		emulator.RunSampleOnEmulatorWithDdl(snippets.FindInBatches, protoDescriptors, ddlStatements...)
+		emulator.RunSampleOnEmulatorWithDdl(databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL, snippets.FindInBatches, protoDescriptors, ddlStatements...)
 	case "batch_dml":
-		emulator.RunSampleOnEmulatorWithDdl(snippets.BatchDml, protoDescriptors, ddlStatements...)
+		emulator.RunSampleOnEmulatorWithDdl(databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL, snippets.BatchDml, protoDescriptors, ddlStatements...)
 	case "auto_save_associations":
-		emulator.RunSampleOnEmulatorWithDdl(snippets.AutoSaveAssociations, protoDescriptors, ddlStatements...)
+		emulator.RunSampleOnEmulatorWithDdl(databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL, snippets.AutoSaveAssociations, protoDescriptors, ddlStatements...)
 	case "interleaved_tables":
-		emulator.RunSampleOnEmulatorWithDdl(snippets.InterleavedTables, protoDescriptors, ddlStatements...)
+		emulator.RunSampleOnEmulatorWithDdl(databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL, snippets.InterleavedTables, protoDescriptors, ddlStatements...)
 	case "read_only_transaction":
-		emulator.RunSampleOnEmulatorWithDdl(snippets.ReadOnlyTransaction, protoDescriptors, ddlStatements...)
+		emulator.RunSampleOnEmulatorWithDdl(databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL, snippets.ReadOnlyTransaction, protoDescriptors, ddlStatements...)
 	case "read_write_transaction":
-		emulator.RunSampleOnEmulatorWithDdl(snippets.ReadWriteTransaction, protoDescriptors, ddlStatements...)
+		emulator.RunSampleOnEmulatorWithDdl(databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL, snippets.ReadWriteTransaction, protoDescriptors, ddlStatements...)
 	case "aborted_transaction":
-		emulator.RunSampleOnEmulatorWithDdl(snippets.AbortedTransaction, protoDescriptors, ddlStatements...)
+		emulator.RunSampleOnEmulatorWithDdl(databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL, snippets.AbortedTransaction, protoDescriptors, ddlStatements...)
 	case "migrations":
-		emulator.RunSampleOnEmulator(snippets.Migrations)
+		emulator.RunSampleOnEmulator(databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL, snippets.Migrations)
 	case "client_library":
-		emulator.RunSampleOnEmulatorWithDdl(snippets.ClientLibrary, protoDescriptors, ddlStatements...)
+		emulator.RunSampleOnEmulatorWithDdl(databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL, snippets.ClientLibrary, protoDescriptors, ddlStatements...)
 	case "uuid_primary_key":
-		emulator.RunSampleOnEmulator(snippets.UuidPrimaryKey)
+		emulator.RunSampleOnEmulator(databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL, snippets.UuidPrimaryKey)
 	case "bit_reversed_sequence":
-		emulator.RunSampleOnEmulator(snippets.BitReversedSequence)
+		emulator.RunSampleOnEmulator(databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL, snippets.BitReversedSequence)
 	case "array_data_type":
-		emulator.RunSampleOnEmulatorWithDdl(snippets.ArrayDataType, protoDescriptors, ddlStatements...)
+		emulator.RunSampleOnEmulatorWithDdl(databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL, snippets.ArrayDataType, protoDescriptors, ddlStatements...)
 	case "custom_spanner_config":
-		emulator.RunSampleOnEmulator(snippets.CustomSpannerConfig)
+		emulator.RunSampleOnEmulator(databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL, snippets.CustomSpannerConfig)
 	case "protobuf_columns":
-		emulator.RunSampleOnEmulatorWithDdl(snippets.ProtobufColumns, protoDescriptors, ddlStatements...)
+		emulator.RunSampleOnEmulatorWithDdl(databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL, snippets.ProtobufColumns, protoDescriptors, ddlStatements...)
 	case "data_types":
-		emulator.RunSampleOnEmulator(snippets.DataTypes)
+		emulator.RunSampleOnEmulator(databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL, snippets.DataTypes)
 	case "last_statement":
-		emulator.RunSampleOnEmulatorWithDdl(snippets.LastStatement, protoDescriptors, ddlStatements...)
+		emulator.RunSampleOnEmulatorWithDdl(databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL, snippets.LastStatement, protoDescriptors, ddlStatements...)
 	case "isolation_level":
-		emulator.RunSampleOnEmulatorWithDdl(snippets.IsolationLevel, protoDescriptors, ddlStatements...)
+		emulator.RunSampleOnEmulatorWithDdl(databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL, snippets.IsolationLevel, protoDescriptors, ddlStatements...)
 	default:
 		fmt.Printf("unknown sample: %s\n", sample)
 		os.Exit(1)

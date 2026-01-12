@@ -1,46 +1,83 @@
-# go-gorm-spanner
+# gorm Dialect for Spanner
 
 [![go.dev reference](https://img.shields.io/badge/go.dev-reference-007d9c?logo=go&logoColor=white&style=flat-square)](https://pkg.go.dev/github.com/googleapis/go-gorm-spanner)
 
-[Google Cloud Spanner](https://cloud.google.com/spanner) ORM for
-Go's [GORM](https://gorm.io/) implementation.
+[Google Cloud Spanner](https://cloud.google.com/spanner) ORM for Go's [GORM](https://gorm.io/) implementation.
+
+This project contains `gorm` dialects for both Spanner GoogleSQL and Spanner PostgreSQL databases.
+
+## GoogleSQL
+
+This example shows how to connect `gorm` to a Spanner GoogleSQL database.
 
 ``` go
 import (
-    "gorm.io/gorm"
-    _ "github.com/googleapis/go-sql-spanner"
+	"fmt"
 
-    spannergorm "github.com/googleapis/go-gorm-spanner"
+	spannergorm "github.com/googleapis/go-gorm-spanner"
+	_ "github.com/googleapis/go-sql-spanner"
+	"gorm.io/gorm"
 )
 
-db, err := gorm.Open(spannergorm.New(spannergorm.Config{
-    DriverName: "spanner",
-    DSN:        "projects/PROJECT/instances/INSTANCE/databases/DATABASE",
-}), &gorm.Config{PrepareStmt: true})
-if err != nil {
-    log.Fatal(err)
-}
+func helloWorld(projectId, instanceId, databaseId string) error {
+	db, err := gorm.Open(spannergorm.New(spannergorm.Config{
+		DriverName: "spanner",
+		DSN:        fmt.Sprintf("projects/%s/instances/%s/databases/%s", projectId, instanceId, databaseId),
+	}), &gorm.Config{PrepareStmt: true})
+	if err != nil {
+		return fmt.Errorf("failed to open database connection: %v\n", err)
+	}
+	var msg string
+	if err := db.Raw("SELECT 'Hello World!'").Scan(&msg).Error; err != nil {
+		return fmt.Errorf("failed to execute query: %v", err)
+	}
+	fmt.Println(msg)
 
-// Print singers with more than 500 likes.
-type Singer struct {
-    gorm.Model
-    Text         string
-    Likes        int
-}
-var singers []Singer
-if err := db.Where("likes > ?", 500).Find(&singers).Error; err != nil {
-    log.Fatal(err)
-}
-for s := range singers {
-    fmt.Println(s.ID, s.Text)
+	return nil
 }
 ```
 
-### Connection URL Properties
+See the [samples directory](samples) for more examples.
+
+## PostgreSQL
+
+This example shows how to connect `gorm` to a Spanner PostgreSQL database.
+
+``` go
+import (
+	"fmt"
+
+	spannerpg "github.com/googleapis/go-gorm-spanner/postgresql"
+	_ "github.com/googleapis/go-sql-spanner"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+)
+
+func helloWorld(projectId, instanceId, databaseId string) error {
+	db, err := gorm.Open(spannerpg.New(postgres.Config{
+		DSN: fmt.Sprintf("projects/%s/instances/%s/databases/%s", projectId, instanceId, databaseId),
+	}), &gorm.Config{})
+	if err != nil {
+		return fmt.Errorf("failed to open database connection: %v\n", err)
+	}
+	var msg string
+	if err := db.Raw("SELECT $1::varchar as greeting", "Hello World from Spanner PostgreSQL!").Scan(&msg).Error; err != nil {
+		return fmt.Errorf("failed to execute query: %v", err)
+	}
+	fmt.Println(msg)
+
+	return nil
+}
+```
+
+See the [PostgreSQL samples directory](postgresql/samples) for more examples for how to use this library with a Spanner
+PostgreSQL database.
+
+## Connection URL Properties
 
 The Cloud Spanner GORM supports the following connection URL properties
 
-#### Commonly Used Properties
+### Commonly Used Properties
 - credentials (String): File name for the credentials to use. The connection will use the default credentials of the environment if no credentials file is specified in the connection string. Example: `projects/my-project/instances/my-instance/databases/my-db;credentials=/path/to/credentials.json`
 - optimizerVersion (String): Sets the default query optimizer version to use for this connection. See also https://cloud.google.com/spanner/docs/query-optimizer/query-optimizer-versions.
 - isolationLevel (String): Sets the default isolation level for read/write transaction. The default is `sql.LevelSerializable`. Other supported values are `sql.LevelRepeatableRead`. Example: `fmt.Sprintf("projects/my-project/instances/my-instance/databases/my-db;isolationLevel=%s", sql.LevelRepeatableRead)`
@@ -51,7 +88,7 @@ minimum and maximum number of sessions for `gorm`.
 
 See https://cloud.google.com/spanner/docs/sessions#multiplexed_sessions for more information about multiplexed sessions.
 
-#### Advanced Properties
+### Advanced Properties
 - numChannels (int): Sets the number of gRPC channels to use. Defaults to 4.
 - retryAbortsInternally (boolean): Boolean that indicates whether the connection should automatically retry aborted errors. The default is true.
 - disableRouteToLeader (boolean): Boolean that indicates if all the requests of type read-write and PDML need to be routed to the leader region. The default is false.
@@ -59,7 +96,7 @@ See https://cloud.google.com/spanner/docs/sessions#multiplexed_sessions for more
 
 Example: `projects/my-project/instances/my-instance/databases/my-db;numChannels=4;retryAbortsInternally=true;disableRouteToLeader=false;usePlainText=false`
 
-#### Additional Spanner Configuration
+### Additional Spanner Configuration
 You can also connect `gorm` to Spanner using a `driver.Connector`. This allows you to supply additional configuration
 for the Spanner client that should be used for `gorm`:
 

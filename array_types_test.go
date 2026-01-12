@@ -76,7 +76,8 @@ func TestInsertNativeArrays(t *testing.T) {
 	if g, w := len(req.Params.Fields), 9; g != w {
 		t.Errorf("num params mismatch\n Got: %v\nWant: %v", g, w)
 	}
-	if g, w := len(req.ParamTypes), 9; g != w {
+	// String arrays are sent as untyped values to allow Spanner to infer the data type from the SQL statement.
+	if g, w := len(req.ParamTypes), 8; g != w {
 		t.Errorf("num param types mismatch\n Got: %v\nWant: %v", g, w)
 	}
 	wantParamTypes := []spannerpb.TypeCode{
@@ -86,13 +87,19 @@ func TestInsertNativeArrays(t *testing.T) {
 		spannerpb.TypeCode_INT64,
 		spannerpb.TypeCode_FLOAT32,
 		spannerpb.TypeCode_FLOAT64,
-		spannerpb.TypeCode_STRING,
+		spannerpb.TypeCode_TYPE_CODE_UNSPECIFIED,
 		spannerpb.TypeCode_TIMESTAMP,
 	}
 	for i, code := range wantParamTypes {
 		param := fmt.Sprintf("p%d", i+1)
-		if g, w := req.ParamTypes[param].ArrayElementType.Code, code; g != w {
-			t.Errorf("%s: param type mismatch\n Got: %v\nWant: %v", param, g, w)
+		if tp, ok := req.ParamTypes[param]; ok {
+			if g, w := tp.ArrayElementType.Code, code; g != w {
+				t.Errorf("%s: param type mismatch\n Got: %v\nWant: %v", param, g, w)
+			}
+		} else {
+			if g, w := spannerpb.TypeCode_TYPE_CODE_UNSPECIFIED, code; g != w {
+				t.Errorf("%s: param type mismatch\n Got: %v\nWant: %v", param, g, w)
+			}
 		}
 	}
 	wantValues := []string{

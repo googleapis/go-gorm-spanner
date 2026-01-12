@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/spanner"
+	"cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
 	"github.com/googleapis/go-gorm-spanner/testutil"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
@@ -35,12 +36,18 @@ import (
 )
 
 func TestMain(m *testing.M) {
+	// Disable client config logging by default.
+	if _, found := os.LookupEnv("GOOGLE_CLOUD_SPANNER_DISABLE_LOG_CLIENT_OPTIONS"); !found {
+		_ = os.Setenv("GOOGLE_CLOUD_SPANNER_DISABLE_LOG_CLIENT_OPTIONS", "true")
+	}
 	cleanup, err := testutil.InitIntegrationTests()
 	if err != nil {
 		log.Fatalf("could not init integration tests: %v", err)
 	}
 	res := m.Run()
+	log.Println("Cleaning up after integration tests...")
 	cleanup()
+	log.Printf("Finished integration tests with result: %d", res)
 	os.Exit(res)
 }
 
@@ -56,7 +63,7 @@ func skipIfShort(t *testing.T) {
 func TestIntegration_DefaultValue(t *testing.T) {
 	skipIfShort(t)
 	t.Parallel()
-	dsn, cleanup, err := testutil.CreateTestDB(context.Background())
+	dsn, cleanup, err := testutil.CreateTestDB(context.Background(), databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL)
 	if err != nil {
 		log.Fatalf("could not init integration tests while creating database: %v", err)
 	}
@@ -111,7 +118,7 @@ func TestIntegration_Distinct(t *testing.T) {
 	}
 
 	t.Parallel()
-	dsn, cleanup, err := testutil.CreateTestDB(context.Background())
+	dsn, cleanup, err := testutil.CreateTestDB(context.Background(), databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL)
 	if err != nil {
 		log.Fatalf("could not init integration tests while creating database: %v", err)
 	}
@@ -195,7 +202,7 @@ func TestIntegration_InsertOrUpdate(t *testing.T) {
 	skipIfShort(t)
 
 	t.Parallel()
-	dsn, cleanup, err := testutil.CreateTestDB(context.Background())
+	dsn, cleanup, err := testutil.CreateTestDB(context.Background(), databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL)
 	if err != nil {
 		log.Fatalf("could not init integration tests while creating database: %v", err)
 	}
@@ -278,7 +285,7 @@ func TestIntegration_CommitTimestamp(t *testing.T) {
 	skipIfShort(t)
 	t.Parallel()
 
-	dsn, cleanup, err := testutil.CreateTestDB(context.Background())
+	dsn, cleanup, err := testutil.CreateTestDB(context.Background(), databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL)
 	if err != nil {
 		log.Fatalf("could not init integration tests while creating database: %v", err)
 	}
@@ -359,7 +366,7 @@ func TestIntegration_RunTransaction(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	dsn, cleanup, err := testutil.CreateTestDB(ctx)
+	dsn, cleanup, err := testutil.CreateTestDB(ctx, databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL)
 	if err != nil {
 		log.Fatalf("could not init integration tests while creating database: %v", err)
 	}

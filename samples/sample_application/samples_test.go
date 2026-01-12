@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	"cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -39,7 +40,7 @@ func TestIntegration_Sample(t *testing.T) {
 	defer cleanup()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
 	defer cancel()
-	dsn, cleanup, err := testutil.CreateTestDB(ctx)
+	dsn, cleanup, err := testutil.CreateTestDB(ctx, databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL)
 	require.NoError(t, err)
 	defer cleanup()
 	// Open db.

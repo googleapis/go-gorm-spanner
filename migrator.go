@@ -37,6 +37,12 @@ const (
 	DisableIdentityColumns       = "DISABLED"
 )
 
+// SpannerMigrator is an interface that is implemented by the gorm Migrator
+// for Spanner for both GoogleSQL and PostgreSQL. Use this interface to
+// get access to custom Spanner features, such as DDL batching.
+//
+// See samples/snippets/migrator.go for an example using GoogleSQL.
+// See postgresql/samples/snippets/migrator.go for an example using PostgreSQL.
 type SpannerMigrator interface {
 	gorm.Migrator
 
