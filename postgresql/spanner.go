@@ -1,3 +1,17 @@
+// Copyright 2026 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package spannerpg
 
 import (
@@ -148,9 +162,11 @@ func isTopLevelStatement() bool {
 
 func BeforeUpdate(db *gorm.DB) {
 	if db.Statement != nil && db.Statement.Schema != nil && db.Statement.Schema.PrimaryFieldDBNames != nil {
-		omit := append(db.Statement.Omits, db.Statement.Schema.PrimaryFieldDBNames...)
+		omits := make([]string, 0, len(db.Statement.Omits)+len(db.Statement.Schema.PrimaryFieldDBNames))
+		omits = append(omits, db.Statement.Omits...)
+		omits = append(omits, db.Statement.Schema.PrimaryFieldDBNames...)
 		// Omit all primary key fields from the SET clause of an UPDATE statement.
-		db.Statement.Omit(omit...)
+		db.Statement.Omit(omits...)
 	}
 }
 
@@ -207,11 +223,18 @@ func (dialector Dialector) Migrator(db *gorm.DB) gorm.Migrator {
 	if c, ok := db.ConnPool.(*sql.Conn); ok && c != nil {
 		conn = c
 	} else {
-		sqlDB, _ := db.DB()
-		conn, _ = sqlDB.Conn(context.Background())
+		sqlDB, err := db.DB()
+		if err == nil {
+			conn, _ = sqlDB.Conn(context.Background())
+		}
 	}
-	db.ConnPool = conn
-	db.Statement.ConnPool = conn
+	// conn is nil if getting the underlying sql.DB failed.
+	// In that case, we just use the original ConnPool of the database,
+	// which again is likely to fail any operation on the migrator.
+	if conn != nil {
+		db.ConnPool = conn
+		db.Statement.ConnPool = conn
+	}
 	return spannerPostgresMigrator{
 		Migrator: postgres.Migrator{
 			Migrator: migrator.Migrator{

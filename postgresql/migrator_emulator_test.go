@@ -153,9 +153,6 @@ func TestMain(m *testing.M) {
 		_ = os.Setenv("GOOGLE_CLOUD_SPANNER_DISABLE_LOG_CLIENT_OPTIONS", "true")
 	}
 
-	// TODO: Remove
-	_ = os.Setenv("SPANNER_EMULATOR_HOST", "localhost:9010")
-
 	cleanup, err := testutil.InitIntegrationTests()
 	if err != nil {
 		log.Fatalf("could not init integration tests: %v", err)

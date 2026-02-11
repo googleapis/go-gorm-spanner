@@ -106,6 +106,60 @@ func TestMigrate(t *testing.T) {
 	}
 }
 
+func TestDisableAutoMigrateBatching(t *testing.T) {
+	t.Parallel()
+
+	server, _, serverTeardown := setupMockedTestServer(t)
+	dialector := NewWithSpannerConfig(postgres.Config{
+		DSN: fmt.Sprintf("%s/projects/p/instances/i/databases/d?useplaintext=true;%s", server.Address, ""),
+	}, SpannerConfig{
+		DisableAutoMigrateBatching: true,
+	})
+	db, server, teardown := setupTestGormConnectionWithDialector(t, server, serverTeardown, dialector)
+	defer teardown()
+
+	anyProto, err := anypb.New(&emptypb.Empty{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server.TestDatabaseAdmin.SetResps([]proto.Message{
+		&longrunningpb.Operation{
+			Name:   "test-operation",
+			Done:   true,
+			Result: &longrunningpb.Operation_Response{Response: anyProto},
+		},
+	})
+
+	err = db.Migrator().AutoMigrate(&singer{}, &album{}, &test{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	requests := server.TestDatabaseAdmin.Reqs()
+	// We should have 5 individual DDL requests, instead of one batch with 5 statements.
+	if g, w := len(requests), 5; g != w {
+		t.Fatalf("request count mismatch\n Got: %v\nWant: %v", g, w)
+	}
+}
+
+func TestMigratorError(t *testing.T) {
+	t.Parallel()
+
+	db, _, teardown := setupTestGormConnection(t)
+	defer teardown()
+
+	// Close the underlying database connection to force an error when getting a migrator.
+	sqlDb, err := db.DB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = sqlDb.Close()
+
+	err = db.Migrator().AutoMigrate(&singer{}, &album{}, &test{})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
 func setupTestGormConnection(t *testing.T) (db *gorm.DB, server *testutil.MockedSpannerInMemTestServer, teardown func()) {
 	return setupTestGormConnectionWithParams(t, "")
 }

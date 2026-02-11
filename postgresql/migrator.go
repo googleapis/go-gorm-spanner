@@ -1,3 +1,17 @@
+// Copyright 2026 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package spannerpg
 
 import (
@@ -77,7 +91,7 @@ func (m spannerPostgresMigrator) AutoMigrate(values ...interface{}) error {
 
 func (m spannerPostgresMigrator) disableAutoMigrateBatching() bool {
 	if cfg, ok := m.Dialector.(Dialector); ok {
-		return cfg.SpannerConfig.AutoOrderByPk
+		return cfg.SpannerConfig.DisableAutoMigrateBatching
 	}
 	return false
 }
@@ -93,10 +107,19 @@ func (m spannerPostgresMigrator) autoMigrate(dryRun bool, values ...interface{})
 		if err := m.StartBatchDDL(); err != nil {
 			return nil, err
 		}
+		defer func() {
+			// Abort any active batch when we leave this function.
+			// This is a no-op if there is no batch on the current connection.
+			_ = m.AbortBatch()
+		}()
 	}
 	if c == 0 {
 		tx := m.DB.Session(&gorm.Session{})
-		tx.Exec(fmt.Sprintf(`alter database "%s" set spanner.default_sequence_kind = 'bit_reversed_positive'`, m.CurrentDatabase()))
+		// The database name is hardcoded in this string as "db", which might seem weird,
+		// but Spanner ignores the database name in ALTER DATABASE statements.
+		if err := tx.Exec(`alter database "db" set spanner.default_sequence_kind = 'bit_reversed_positive'`).Error; err != nil {
+			return nil, err
+		}
 	}
 	err = m.Migrator.AutoMigrate(values...)
 	if err == nil {
@@ -166,11 +189,9 @@ func (m spannerPostgresMigrator) CreateTable(values ...interface{}) (err error) 
 			// Add a generated primary key.
 			if !hasPrimaryKeyInDataType && len(stmt.Schema.PrimaryFields) == 0 {
 				pk := &schema.Field{
-					//AutoIncrement: true,
-					Name:     "spanner_gorm_generated_id",
-					DBName:   "spanner_gorm_generated_id",
-					DataType: "serial primary key",
-					//DataType:          schema.Uint,
+					Name:              "spanner_gorm_generated_id",
+					DBName:            "spanner_gorm_generated_id",
+					DataType:          "serial primary key",
 					FieldType:         reflect.TypeOf(int64(0)),
 					IndirectFieldType: reflect.TypeOf(int64(0)),
 				}
@@ -178,7 +199,6 @@ func (m spannerPostgresMigrator) CreateTable(values ...interface{}) (err error) 
 				stmt.Schema.Fields = append(stmt.Schema.Fields, pk)
 				stmt.Schema.FieldsByDBName[pk.DBName] = pk
 				stmt.Schema.FieldsByName[pk.Name] = pk
-				// stmt.Schema.PrimaryFields = append(stmt.Schema.PrimaryFields, pk)
 			}
 			return nil
 		}); err != nil {
@@ -245,11 +265,11 @@ func (m spannerPostgresMigrator) dropForeignKeysReferencingTable(tx *gorm.DB, st
 
 func (m spannerPostgresMigrator) dropTableIndexes(tx *gorm.DB, stmt *gorm.Statement) error {
 	currentSchema, curTable := m.CurrentSchema(stmt, stmt.Table)
-	fk := m.queryRawWithTx(tx, "select index_name from information_schema.indexes WHERE table_schema = ? AND table_name = ? AND index_type in ('INDEX') AND spanner_is_managed='NO'", currentSchema, curTable)
-	if fk.Error != nil {
-		return fk.Error
+	idx := m.queryRawWithTx(tx, "select index_name from information_schema.indexes WHERE table_schema = ? AND table_name = ? AND index_type in ('INDEX') AND spanner_is_managed='NO'", currentSchema, curTable)
+	if idx.Error != nil {
+		return idx.Error
 	}
-	rows, err := fk.Rows()
+	rows, err := idx.Rows()
 	if err != nil {
 		return err
 	}

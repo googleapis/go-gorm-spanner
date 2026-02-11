@@ -45,9 +45,7 @@ func TestMain(m *testing.M) {
 		log.Fatalf("could not init integration tests: %v", err)
 	}
 	res := m.Run()
-	log.Println("Cleaning up after integration tests...")
 	cleanup()
-	log.Printf("Finished integration tests with result: %d", res)
 	os.Exit(res)
 }
 
