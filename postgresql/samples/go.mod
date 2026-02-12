@@ -2,15 +2,15 @@ module sample
 
 go 1.24.0
 
-toolchain go1.25.5
+toolchain go1.26.0
 
 require (
 	cloud.google.com/go v0.123.0
 	cloud.google.com/go/spanner v1.88.0
 	github.com/google/uuid v1.6.0
-	github.com/googleapis/go-gorm-spanner v1.9.2-0.20260112130927-fc18997408aa
-	github.com/googleapis/go-gorm-spanner/postgresql/samples v1.9.2-0.20260112130927-fc18997408aa
-	github.com/googleapis/go-gorm-spanner/samples v0.0.0-20260105140813-323dad1f1396
+	github.com/googleapis/go-gorm-spanner 7ebcabc44a11
+	github.com/googleapis/go-gorm-spanner/postgresql/samples 7ebcabc44a11
+	github.com/googleapis/go-gorm-spanner/samples 7ebcabc44a11
 	github.com/googleapis/go-sql-spanner v1.23.0
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/api v0.266.0

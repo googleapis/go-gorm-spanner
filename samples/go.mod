@@ -2,7 +2,7 @@ module github.com/googleapis/go-gorm-spanner/samples
 
 go 1.24.0
 
-toolchain go1.25.5
+toolchain go1.26.0
 
 replace github.com/googleapis/go-gorm-spanner => ../
 
@@ -13,7 +13,7 @@ require (
 	github.com/docker/go-connections v0.6.0
 	github.com/golang/protobuf v1.5.4
 	github.com/google/uuid v1.6.0
-	github.com/googleapis/go-gorm-spanner v1.9.0
+	github.com/googleapis/go-gorm-spanner v1.9.1
 	github.com/googleapis/go-sql-spanner v1.23.0
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/api v0.266.0
