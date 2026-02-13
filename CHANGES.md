@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.10.0](https://github.com/googleapis/go-gorm-spanner/compare/v1.9.1...v1.10.0) (2026-02-13)
+
+
+### Features
+
+* Support Spanner PostgreSQL databases ([#199](https://github.com/googleapis/go-gorm-spanner/issues/199)) ([7ebcabc](https://github.com/googleapis/go-gorm-spanner/commit/7ebcabc44a114cd146cb34e5a68ac89866b7fd01))
+
+
+### Bug Fixes
+
+* Update all dependencies ([#197](https://github.com/googleapis/go-gorm-spanner/issues/197)) ([7f65c12](https://github.com/googleapis/go-gorm-spanner/commit/7f65c12c7062783c1e0951a9bde0a2578190015c))
+* Update all dependencies ([#201](https://github.com/googleapis/go-gorm-spanner/issues/201)) ([a8ab50e](https://github.com/googleapis/go-gorm-spanner/commit/a8ab50eab0af8893c3f1d1bc4b3850a3c8ab314b))
+
 ## [1.9.1](https://github.com/googleapis/go-gorm-spanner/compare/v1.9.0...v1.9.1) (2026-01-05)
 
 
