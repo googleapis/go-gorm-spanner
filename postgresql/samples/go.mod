@@ -11,10 +11,10 @@ require (
 	github.com/googleapis/go-gorm-spanner v1.9.1
 	github.com/googleapis/go-gorm-spanner/postgresql/samples v1.9.1
 	github.com/googleapis/go-gorm-spanner/samples v1.9.1
-	github.com/googleapis/go-sql-spanner v1.23.0
+	github.com/googleapis/go-sql-spanner v1.24.0
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/api v0.266.0
-	google.golang.org/grpc v1.78.0
+	google.golang.org/grpc v1.79.1
 	gorm.io/driver/postgres v1.6.0
 	gorm.io/gorm v1.31.1
 )
@@ -82,7 +82,7 @@ require (
 	golang.org/x/time v0.14.0 // indirect
 	google.golang.org/genproto v0.0.0-20260128011058-8636f8732409 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260203192932-546029d2fa20 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260203192932-546029d2fa20 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260209200024-4cfbd4190f57 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
