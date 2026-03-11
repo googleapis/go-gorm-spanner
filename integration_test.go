@@ -72,7 +72,7 @@ func TestIntegration_DefaultValue(t *testing.T) {
 		DSN:        dsn,
 	}), &gorm.Config{PrepareStmt: true})
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("connect failed %v", err)
 	}
 
 	type Harumph struct {
@@ -375,7 +375,7 @@ func TestIntegration_RunTransaction(t *testing.T) {
 		DSN:        dsn,
 	}), &gorm.Config{PrepareStmt: true})
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("failed to open db: %v", err)
 	}
 
 	type Number struct {

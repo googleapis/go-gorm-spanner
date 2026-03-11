@@ -25,7 +25,10 @@ import (
 	"time"
 
 	"google.golang.org/api/iterator"
+	"google.golang.org/api/option"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"cloud.google.com/go/spanner"
 	database "cloud.google.com/go/spanner/admin/database/apiv1"
@@ -33,6 +36,8 @@ import (
 	instance "cloud.google.com/go/spanner/admin/instance/apiv1"
 	"cloud.google.com/go/spanner/admin/instance/apiv1/instancepb"
 )
+
+const experimentalHostId = "default"
 
 var projectId, instanceId string
 var Skipped bool
@@ -46,6 +51,11 @@ func init() {
 	}
 	if projectId, ok = os.LookupEnv("SPANNER_TEST_PROJECT"); !ok {
 		projectId = "test-project"
+	}
+
+	if _, ok := os.LookupEnv("SPANNER_EXPERIMENTAl_HOST"); ok {
+		projectId = experimentalHostId
+		instanceId = experimentalHostId
 	}
 }
 
@@ -150,7 +160,19 @@ func initTestInstance(config string) (cleanup func(), err error) {
 }
 
 func CreateTestDB(ctx context.Context, dialect databasepb.DatabaseDialect, statements ...string) (dsn string, cleanup func(), err error) {
-	databaseAdminClient, err := database.NewDatabaseAdminClient(ctx)
+
+	var opts []option.ClientOption
+	host, hasExperimentalHost := os.LookupEnv("SPANNER_EXPERIMENTAL_HOST")
+	if hasExperimentalHost {
+		opts = []option.ClientOption{
+			option.WithEndpoint(host),
+			option.WithoutAuthentication(),
+			option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
+		}
+		projectId = experimentalHostId
+		instanceId = experimentalHostId
+	}
+	databaseAdminClient, err := database.NewDatabaseAdminClient(ctx, opts...)
 	if err != nil {
 		return "", nil, err
 	}
@@ -198,6 +220,9 @@ func CreateTestDB(ctx context.Context, dialect databasepb.DatabaseDialect, state
 
 	//dsn = "projects/" + projectId + "/instances/" + instanceId + "/databases/" + databaseId + "?decode_numeric_to_string=true"
 	dsn = "projects/" + projectId + "/instances/" + instanceId + "/databases/" + databaseId
+	if hasExperimentalHost {
+		dsn = host + "/databases/" + databaseId + "?use_plain_text=true;is_experimental_host=true"
+	}
 	cleanup = func() {
 		databaseAdminClient, err := database.NewDatabaseAdminClient(ctx)
 		if err != nil {
@@ -216,6 +241,11 @@ func InitIntegrationTests() (cleanup func(), err error) {
 	noop := func() {}
 	if testing.Short() {
 		log.Println("Integration tests skipped in -short mode.")
+		return noop, nil
+	}
+
+	if _, hasExperimentalHost := os.LookupEnv("SPANNER_EXPERIMENTAL_HOST"); hasExperimentalHost {
+		log.Println("Skipping instance cleanup and creation as SPANNER_EXPERIMENTAL_HOST has been set")
 		return noop, nil
 	}
 	_, hasCredentials := os.LookupEnv("GOOGLE_APPLICATION_CREDENTIALS")
