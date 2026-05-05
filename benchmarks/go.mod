@@ -7,12 +7,12 @@ toolchain go1.26.2
 replace github.com/googleapis/go-gorm-spanner => ../
 
 require (
-	cloud.google.com/go/spanner v1.89.0
+	cloud.google.com/go/spanner v1.91.0
 	github.com/google/uuid v1.6.0
-	github.com/googleapis/go-gorm-spanner v1.10.0
-	github.com/googleapis/go-sql-spanner v1.25.0
-	google.golang.org/genproto v0.0.0-20260414002931-afd174a4e478
-	google.golang.org/grpc v1.80.0
+	github.com/googleapis/go-gorm-spanner v1.10.1
+	github.com/googleapis/go-sql-spanner v1.25.1
+	google.golang.org/genproto v0.0.0-20260504160031-60b97b32f348
+	google.golang.org/grpc v1.81.0
 	gorm.io/datatypes v1.2.7
 	gorm.io/gorm v1.31.1
 )
@@ -23,9 +23,9 @@ require (
 	cloud.google.com/go/auth v0.20.0 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
-	cloud.google.com/go/iam v1.9.0 // indirect
-	cloud.google.com/go/longrunning v0.11.0 // indirect
-	cloud.google.com/go/monitoring v1.27.0 // indirect
+	cloud.google.com/go/iam v1.10.0 // indirect
+	cloud.google.com/go/longrunning v0.12.0 // indirect
+	cloud.google.com/go/monitoring v1.28.0 // indirect
 	filippo.io/edwards25519 v1.2.0 // indirect
 	github.com/GoogleCloudPlatform/grpc-gcp-go/grpcgcp v1.6.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.32.0 // indirect
@@ -40,7 +40,7 @@ require (
 	github.com/go-sql-driver/mysql v1.9.3 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.14 // indirect
-	github.com/googleapis/gax-go/v2 v2.21.0 // indirect
+	github.com/googleapis/gax-go/v2 v2.22.0 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
@@ -63,9 +63,9 @@ require (
 	golang.org/x/sys v0.43.0 // indirect
 	golang.org/x/text v0.36.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
-	google.golang.org/api v0.275.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20260414002931-afd174a4e478 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260414002931-afd174a4e478 // indirect
+	google.golang.org/api v0.276.0 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20260427160629-7cedc36a6bc4 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260427160629-7cedc36a6bc4 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gorm.io/driver/mysql v1.6.0 // indirect
 )
