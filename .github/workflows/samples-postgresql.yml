@@ -15,6 +15,11 @@ jobs:
           go-version: ${{ matrix.go-version }}
       - name: Checkout code
         uses: actions/checkout@v6
+      - name: Pre-pull Spanner Emulator image
+        run: |
+          for i in {1..5}; do
+            docker pull gcr.io/cloud-spanner-emulator/emulator:latest && break || sleep 5
+          done
       - name: Run Hello World
         working-directory: ./postgresql/samples/helloworld
         run: go run main.go

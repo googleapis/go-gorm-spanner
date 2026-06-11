@@ -114,16 +114,22 @@ func startEmulator() (host, port string, err error) {
 	if err != nil {
 		return "", "", err
 	}
-	// Pull the Spanner Emulator docker image.
-	reader, err := cli.ImagePull(ctx, "gcr.io/cloud-spanner-emulator/emulator", image.PullOptions{})
-	if err != nil {
-		return "", "", err
+	// Pull the Spanner Emulator docker image if not present locally.
+	var hasImage bool
+	if _, _, err := cli.ImageInspectWithRaw(ctx, "gcr.io/cloud-spanner-emulator/emulator"); err == nil {
+		hasImage = true
 	}
-	defer func() { _ = reader.Close() }()
-	// cli.ImagePull is asynchronous.
-	// The reader needs to be read completely for the pull operation to complete.
-	if _, err := io.Copy(io.Discard, reader); err != nil {
-		return "", "", err
+	if !hasImage {
+		reader, err := cli.ImagePull(ctx, "gcr.io/cloud-spanner-emulator/emulator", image.PullOptions{})
+		if err != nil {
+			return "", "", err
+		}
+		defer func() { _ = reader.Close() }()
+		// cli.ImagePull is asynchronous.
+		// The reader needs to be read completely for the pull operation to complete.
+		if _, err := io.Copy(io.Discard, reader); err != nil {
+			return "", "", err
+		}
 	}
 	// Create and start a container with the emulator.
 	resp, err := cli.ContainerCreate(ctx, &container.Config{
@@ -140,10 +146,8 @@ func startEmulator() (host, port string, err error) {
 	if err := cli.ContainerStart(ctx, containerId, container.StartOptions{}); err != nil {
 		return "", "", err
 	}
-	// Wait max 10 seconds or until the emulator is running.
+	// Wait max 10 seconds or until the emulator container is running.
 	for c := 0; c < 20; c++ {
-		// Always wait at least 500 milliseconds to ensure that the emulator is actually ready, as the
-		// state can be reported as ready, while the emulator (or network interface) is actually not ready.
 		<-time.After(500 * time.Millisecond)
 		resp, err := cli.ContainerInspect(ctx, containerId)
 		if err != nil {
@@ -160,6 +164,29 @@ func startEmulator() (host, port string, err error) {
 	}
 	if err := os.Setenv("SPANNER_EMULATOR_HOST", fmt.Sprintf("%s:%s", host, port)); err != nil {
 		return "", "", err
+	}
+
+	// Wait max 10 seconds for the gRPC server to be fully ready by making lightweight API calls.
+	var ready bool
+	for c := 0; c < 20; c++ {
+		attemptCtx, attemptCancel := context.WithTimeout(ctx, 2*time.Second)
+		adminClient, err := instance.NewInstanceAdminClient(attemptCtx)
+		if err == nil {
+			_, err = adminClient.GetInstance(attemptCtx, &instancepb.GetInstanceRequest{
+				Name: "projects/my-project/instances/non-existing",
+			})
+			_ = adminClient.Close()
+			if err == nil || spanner.ErrCode(err) == codes.NotFound {
+				ready = true
+				attemptCancel()
+				break
+			}
+		}
+		attemptCancel()
+		<-time.After(500 * time.Millisecond)
+	}
+	if !ready {
+		return "", "", fmt.Errorf("emulator started but failed to respond to gRPC requests within 10 seconds")
 	}
 	return
 }
