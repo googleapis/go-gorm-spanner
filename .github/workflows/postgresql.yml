@@ -19,9 +19,9 @@ jobs:
         with:
           go-version: 1.26.x
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Checkout gorm
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: go-gorm/gorm
           path: postgresql/tests/gorm
