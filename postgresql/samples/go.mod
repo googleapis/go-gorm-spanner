@@ -11,9 +11,9 @@ require (
 	github.com/googleapis/go-gorm-spanner v1.10.1
 	github.com/googleapis/go-gorm-spanner/postgresql/samples v1.9.1
 	github.com/googleapis/go-gorm-spanner/samples v1.9.1
-	github.com/googleapis/go-sql-spanner v1.25.1
+	github.com/googleapis/go-sql-spanner v1.25.2
 	github.com/stretchr/testify v1.11.1
-	google.golang.org/api v0.285.0
+	google.golang.org/api v0.286.0
 	google.golang.org/grpc v1.81.1
 	gorm.io/driver/postgres v1.6.0
 	gorm.io/gorm v1.31.1
