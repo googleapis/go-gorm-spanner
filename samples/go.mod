@@ -13,7 +13,7 @@ require (
 	github.com/docker/go-connections v0.7.0
 	github.com/golang/protobuf v1.5.4
 	github.com/google/uuid v1.6.0
-	github.com/googleapis/go-gorm-spanner v1.10.1
+	github.com/googleapis/go-gorm-spanner v1.10.2
 	github.com/googleapis/go-sql-spanner v1.25.2
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/api v0.286.0
