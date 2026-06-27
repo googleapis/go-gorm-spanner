@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.10.3](https://github.com/googleapis/go-gorm-spanner/compare/v1.10.2...v1.10.3) (2026-06-27)
+
+
+### Bug Fixes
+
+* Update all dependencies ([#238](https://github.com/googleapis/go-gorm-spanner/issues/238)) ([d81b39e](https://github.com/googleapis/go-gorm-spanner/commit/d81b39e7400dbef694f9cd1581322577921068dc))
+* Update module cloud.google.com/go/longrunning to v1.1.0 ([#241](https://github.com/googleapis/go-gorm-spanner/issues/241)) ([245eff1](https://github.com/googleapis/go-gorm-spanner/commit/245eff175aca71a0202fe1718a3b4156f9f5b865))
+* Update module gorm.io/gorm to v1.31.2 ([#240](https://github.com/googleapis/go-gorm-spanner/issues/240)) ([c44d244](https://github.com/googleapis/go-gorm-spanner/commit/c44d244b935b86983738be0a6580916662bbe1ef))
+
 ## [1.10.2](https://github.com/googleapis/go-gorm-spanner/compare/v1.10.1...v1.10.2) (2026-06-23)
 
 
