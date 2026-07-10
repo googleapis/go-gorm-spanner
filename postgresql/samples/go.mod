@@ -13,7 +13,7 @@ require (
 	github.com/googleapis/go-gorm-spanner/samples v1.9.1
 	github.com/googleapis/go-sql-spanner v1.26.0
 	github.com/stretchr/testify v1.11.1
-	google.golang.org/api v0.287.1
+	google.golang.org/api v0.288.0
 	google.golang.org/grpc v1.82.0
 	gorm.io/driver/postgres v1.6.0
 	gorm.io/gorm v1.31.2
