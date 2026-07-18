@@ -7,7 +7,7 @@ toolchain go1.26.5
 replace github.com/googleapis/go-gorm-spanner => ../
 
 require (
-	cloud.google.com/go/spanner v1.92.0
+	cloud.google.com/go/spanner v1.93.0
 	github.com/google/uuid v1.6.0
 	github.com/googleapis/go-gorm-spanner v1.10.2
 	github.com/googleapis/go-sql-spanner v1.26.0
