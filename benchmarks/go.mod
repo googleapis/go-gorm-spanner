@@ -11,7 +11,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/googleapis/go-gorm-spanner v1.10.2
 	github.com/googleapis/go-sql-spanner v1.26.0
-	google.golang.org/genproto v0.0.0-20260720211330-0afa2a65878a
+	google.golang.org/genproto v0.0.0-20260723215102-3fe39f3c1018
 	google.golang.org/grpc v1.82.1
 	gorm.io/datatypes v1.2.7
 	gorm.io/gorm v1.31.2
