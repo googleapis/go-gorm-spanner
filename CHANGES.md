@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.10.3](https://github.com/googleapis/go-gorm-spanner/compare/v1.10.2...v1.10.3) (2026-07-24)
+
+
+### Bug Fixes
+
+* Update all dependencies ([#238](https://github.com/googleapis/go-gorm-spanner/issues/238)) ([d81b39e](https://github.com/googleapis/go-gorm-spanner/commit/d81b39e7400dbef694f9cd1581322577921068dc))
+* Update all dependencies ([#245](https://github.com/googleapis/go-gorm-spanner/issues/245)) ([82fc770](https://github.com/googleapis/go-gorm-spanner/commit/82fc7704e56b58afbf5d4c3a294e821a8aa3ef3d))
+* Update all dependencies ([#249](https://github.com/googleapis/go-gorm-spanner/issues/249)) ([073ccab](https://github.com/googleapis/go-gorm-spanner/commit/073ccab2d1d453a7205561280159e03fbcf1dcd1))
+* Update all dependencies ([#250](https://github.com/googleapis/go-gorm-spanner/issues/250)) ([bb04a43](https://github.com/googleapis/go-gorm-spanner/commit/bb04a433d21dd36a4c54781b1ace9bfe0c65bbf2))
+* Update google.golang.org/genproto digest to 0afa2a6 ([#252](https://github.com/googleapis/go-gorm-spanner/issues/252)) ([dfdcf4e](https://github.com/googleapis/go-gorm-spanner/commit/dfdcf4e886ebee7aa99d14badca55d5570707302))
+* Update google.golang.org/genproto digest to 3fe39f3 ([#254](https://github.com/googleapis/go-gorm-spanner/issues/254)) ([0d5933a](https://github.com/googleapis/go-gorm-spanner/commit/0d5933a8662eb8be4dab1b2306a20c9099a64721))
+* Update google.golang.org/genproto digest to f5fc221 ([#248](https://github.com/googleapis/go-gorm-spanner/issues/248)) ([f57444b](https://github.com/googleapis/go-gorm-spanner/commit/f57444b7555c6c7af46bd375fbfbcddc2c1971d2))
+* Update module cloud.google.com/go/longrunning to v1.1.0 ([#241](https://github.com/googleapis/go-gorm-spanner/issues/241)) ([245eff1](https://github.com/googleapis/go-gorm-spanner/commit/245eff175aca71a0202fe1718a3b4156f9f5b865))
+* Update module cloud.google.com/go/longrunning to v1.2.0 ([#246](https://github.com/googleapis/go-gorm-spanner/issues/246)) ([fad56ba](https://github.com/googleapis/go-gorm-spanner/commit/fad56baddd9e5b392bf10e7d1a9118b1d15d33cf))
+* Update module github.com/googleapis/go-sql-spanner to v1.26.0 ([#242](https://github.com/googleapis/go-gorm-spanner/issues/242)) ([fa4711e](https://github.com/googleapis/go-gorm-spanner/commit/fa4711ee50bd5608447fafd17e1520d32f7ed0ea))
+* Update module google.golang.org/api to v0.288.0 ([#247](https://github.com/googleapis/go-gorm-spanner/issues/247)) ([fddb87a](https://github.com/googleapis/go-gorm-spanner/commit/fddb87a071de7e1ddd21e1429cdea406856b40af))
+* Update module google.golang.org/api to v0.290.0 ([#253](https://github.com/googleapis/go-gorm-spanner/issues/253)) ([2e7992f](https://github.com/googleapis/go-gorm-spanner/commit/2e7992f689481845c2835b5093f825a9cd72c962))
+* Update module gorm.io/gorm to v1.31.2 ([#240](https://github.com/googleapis/go-gorm-spanner/issues/240)) ([c44d244](https://github.com/googleapis/go-gorm-spanner/commit/c44d244b935b86983738be0a6580916662bbe1ef))
+
 ## [1.10.2](https://github.com/googleapis/go-gorm-spanner/compare/v1.10.1...v1.10.2) (2026-06-23)
 
 
