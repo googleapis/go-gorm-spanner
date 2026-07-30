@@ -7,7 +7,7 @@ toolchain go1.26.5
 require (
 	cloud.google.com/go v0.123.0
 	cloud.google.com/go/longrunning v1.2.0
-	cloud.google.com/go/spanner v1.93.0
+	cloud.google.com/go/spanner v1.94.0
 	github.com/golang/protobuf v1.5.4
 	github.com/google/go-cmp v0.7.0
 	github.com/googleapis/gax-go/v2 v2.23.0

@@ -6,7 +6,7 @@ toolchain go1.26.5
 
 require (
 	cloud.google.com/go v0.123.0
-	cloud.google.com/go/spanner v1.93.0
+	cloud.google.com/go/spanner v1.94.0
 	github.com/google/uuid v1.6.0
 	github.com/googleapis/go-gorm-spanner v1.10.2
 	github.com/googleapis/go-gorm-spanner/postgresql/samples v1.9.1
