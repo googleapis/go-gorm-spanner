@@ -21,7 +21,7 @@ import (
 
 	"cloud.google.com/go/spanner"
 	spannerpg "github.com/googleapis/go-gorm-spanner/postgresql"
-	"github.com/googleapis/go-gorm-spanner/postgresql/samples/snippets/sample_model"
+	"github.com/googleapis/go-gorm-spanner/samples/postgresql/snippets/sample_model"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )

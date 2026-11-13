@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"flag"
 	"fmt"
 	"math/rand"
 	"os"
@@ -86,6 +87,10 @@ type Album struct {
 }
 
 func TestMain(m *testing.M) {
+	flag.Parse()
+	if f := flag.Lookup("test.bench"); (f == nil || f.Value.String() == "") && os.Getenv("BENCHMARK_PROJECT_ID") == "" {
+		os.Exit(m.Run())
+	}
 	fmt.Printf("Initializing benchmarks...\n")
 	if err := setup(); err != nil {
 		fmt.Printf("failed to initialize benchmark: %v", err)

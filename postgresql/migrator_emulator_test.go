@@ -495,10 +495,10 @@ func TestMigrateUniqueFieldFails(t *testing.T) {
 		}
 		return err.Error()
 	}
-	if g, w := errString(db.AutoMigrate(&As{})), "rpc error: code = FailedPrecondition desc = <UNIQUE> constraint is not supported, create a unique index instead."; g != w {
+	if g, w := errString(db.AutoMigrate(&As{})), "[SQLSTATE XX000] rpc error: code = FailedPrecondition desc = <UNIQUE> constraint is not supported, create a unique index instead."; g != w {
 		t.Fatalf("first migrate error mismatch\n Got: %v\nWant: %v", g, w)
 	}
-	if g, w := errString(db.AutoMigrate(&As{})), "rpc error: code = FailedPrecondition desc = <UNIQUE> constraint is not supported, create a unique index instead."; g != w {
+	if g, w := errString(db.AutoMigrate(&As{})), "[SQLSTATE XX000] rpc error: code = FailedPrecondition desc = <UNIQUE> constraint is not supported, create a unique index instead."; g != w {
 		t.Fatalf("second migrate error mismatch\n Got: %v\nWant: %v", g, w)
 	}
 }

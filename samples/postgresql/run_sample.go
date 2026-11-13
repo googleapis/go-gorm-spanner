@@ -21,9 +21,9 @@ import (
 	"strings"
 
 	"cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
-	pgsamples "github.com/googleapis/go-gorm-spanner/postgresql/samples/sample_application"
-	"github.com/googleapis/go-gorm-spanner/postgresql/samples/snippets"
 	"github.com/googleapis/go-gorm-spanner/samples/emulator"
+	pgsamples "github.com/googleapis/go-gorm-spanner/samples/postgresql/sample_application"
+	"github.com/googleapis/go-gorm-spanner/samples/postgresql/snippets"
 )
 
 //go:embed snippets/sample_model/data_model.sql

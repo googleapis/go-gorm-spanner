@@ -70,7 +70,7 @@ func helloWorld(projectId, instanceId, databaseId string) error {
 }
 ```
 
-See the [PostgreSQL samples directory](postgresql/samples) for more examples for how to use this library with a Spanner
+See the [PostgreSQL samples directory](samples/postgresql) for more examples for how to use this library with a Spanner
 PostgreSQL database.
 
 ## Connection URL Properties
