@@ -36,7 +36,6 @@ import (
 	"github.com/shopspring/decimal"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"gorm.io/datatypes"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/migrator"
@@ -56,7 +55,7 @@ type Album struct {
 	gorm.Model
 	Title           string
 	MarketingBudget decimal.NullDecimal
-	ReleaseDate     datatypes.Date
+	ReleaseDate     civil.Date `gorm:"type:date"`
 	CoverPicture    []byte
 	Singer          Singer
 	SingerId        int64
