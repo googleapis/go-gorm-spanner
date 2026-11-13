@@ -39,7 +39,7 @@ func helloWorld(projectId, instanceId, databaseId string) error {
 
 ## Samples
 
-See the [samples directory](samples/snippets) for a list of ready-to-run samples that show how to use Spanner PostgreSQL
+See the [samples directory](../samples/postgresql/snippets) for a list of ready-to-run samples that show how to use Spanner PostgreSQL
 features with gorm.
 
 ## Migrations

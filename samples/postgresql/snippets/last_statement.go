@@ -19,7 +19,7 @@ import (
 	"fmt"
 
 	spannerpg "github.com/googleapis/go-gorm-spanner/postgresql"
-	"github.com/googleapis/go-gorm-spanner/postgresql/samples/snippets/sample_model"
+	"github.com/googleapis/go-gorm-spanner/samples/postgresql/snippets/sample_model"
 	_ "github.com/googleapis/go-sql-spanner"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"

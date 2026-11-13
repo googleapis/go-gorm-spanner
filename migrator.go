@@ -42,7 +42,7 @@ const (
 // get access to custom Spanner features, such as DDL batching.
 //
 // See samples/snippets/migrator.go for an example using GoogleSQL.
-// See postgresql/samples/snippets/migrator.go for an example using PostgreSQL.
+// See samples/postgresql/snippets/migrations.go for an example using PostgreSQL.
 type SpannerMigrator interface {
 	gorm.Migrator
 
