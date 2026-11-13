@@ -30,6 +30,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/googleapis/go-gorm-spanner/testutil"
 	"github.com/shopspring/decimal"
+	"google.golang.org/grpc/codes"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/migrator"
@@ -577,5 +578,108 @@ func verifyColumnType(t *testing.T, db *gorm.DB, table, column, want string) {
 	}
 	if g, w := tp, want; g != w {
 		t.Fatalf("data type mismatch for column %v.%v\n Got: %v\nWant: %v", table, column, g, w)
+	}
+}
+
+func TestAutoMigrate_SequenceQuoting(t *testing.T) {
+	skipIfShortOrNotEmulator(t)
+	t.Parallel()
+
+	type standardSequenceModel struct {
+		ID   uint `gorm:"primarykey" gorm_sequence_name:"overridden_sequence_name"`
+		Name string
+	}
+	type keywordSequenceModel struct {
+		ID   uint `gorm:"primarykey" gorm_sequence_name:"select"`
+		Name string
+	}
+	type hyphenTableModel struct {
+		ID   uint `gorm:"primarykey"`
+		Name string
+	}
+
+	tests := []struct {
+		name      string
+		tableName string
+		model     interface{}
+		wantCode  codes.Code
+		newRow    func() (any, func() uint)
+	}{
+		{
+			name:  "overridden sequence name",
+			model: &standardSequenceModel{},
+			newRow: func() (any, func() uint) {
+				row := &standardSequenceModel{Name: "alice"}
+				return row, func() uint { return row.ID }
+			},
+		},
+		{
+			name:  "reserved keyword sequence name",
+			model: &keywordSequenceModel{},
+			newRow: func() (any, func() uint) {
+				row := &keywordSequenceModel{Name: "bob"}
+				return row, func() uint { return row.ID }
+			},
+		},
+		{
+			name:      "hyphenated table name rejected as invalid identifier not syntax error",
+			tableName: "my-singers",
+			model:     &hyphenTableModel{},
+			wantCode:  codes.InvalidArgument,
+		},
+		{
+			name:     "injection payload rejected as invalid identifier not executed",
+			model:    &injectionTableNameModel{},
+			wantCode: codes.InvalidArgument,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			dsn, cleanup, err := testutil.CreateTestDB(context.Background(), databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL)
+			if err != nil {
+				t.Fatalf("could not create test database: %v", err)
+			}
+			defer cleanup()
+
+			db, err := gorm.Open(New(Config{
+				DriverName:          "spanner",
+				DSN:                 dsn,
+				DefaultSequenceKind: DisableIdentityColumns,
+			}), &gorm.Config{PrepareStmt: true})
+			if err != nil {
+				t.Fatalf("failed to open gorm db: %v", err)
+			}
+			defer func() {
+				if sqlDB, err := db.DB(); err == nil && sqlDB != nil {
+					_ = sqlDB.Close()
+				}
+			}()
+
+			migratorDB := db
+			if tc.tableName != "" {
+				migratorDB = db.Table(tc.tableName)
+			}
+			err = migratorDB.Migrator().AutoMigrate(tc.model)
+			if tc.wantCode != codes.OK {
+				if g, w := spanner.ErrCode(err), tc.wantCode; g != w {
+					t.Fatalf("AutoMigrate error code mismatch\nGot:  %v (%v)\nWant: %v", g, err, w)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("AutoMigrate failed: %v", err)
+			}
+
+			row, getID := tc.newRow()
+			if err := db.Create(row).Error; err != nil {
+				t.Fatalf("Create failed: %v", err)
+			}
+			if g := getID(); g == 0 {
+				t.Errorf("expected generated ID > 0, got %d", g)
+			}
+		})
 	}
 }

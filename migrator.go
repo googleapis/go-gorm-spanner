@@ -186,12 +186,16 @@ func (m spannerMigrator) CreateTable(values ...interface{}) error {
 					if sequence == "" {
 						sequence = stmt.Table + "_seq"
 					}
-					if err := tx.Exec("CREATE SEQUENCE IF NOT EXISTS " +
-						sequence +
-						` OPTIONS (sequence_kind = "bit_reversed_positive")`).Error; err != nil {
+					// Quote as a plain string to avoid clause.CurrentTable ("~~~ct~~~") substitution,
+					// and pass as clause.Expr so it is not re-quoted or bound as a parameter.
+					quotedSequence := stmt.Quote(sequence)
+					if err := tx.Exec(
+						`CREATE SEQUENCE IF NOT EXISTS ? OPTIONS (sequence_kind = "bit_reversed_positive")`,
+						clause.Expr{SQL: quotedSequence},
+					).Error; err != nil {
 						return err
 					}
-					f.DefaultValue = "GET_NEXT_SEQUENCE_VALUE(Sequence " + sequence + ")"
+					f.DefaultValue = "GET_NEXT_SEQUENCE_VALUE(Sequence " + quotedSequence + ")"
 					// Reset the default value to nothing after finishing migration.
 					//goland:noinspection GoDeferInLoop
 					defer func() { f.DefaultValue = "" }()
