@@ -2,7 +2,7 @@ module github.com/googleapis/go-gorm-spanner/samples
 
 go 1.26.0
 
-toolchain go1.26.5
+toolchain go1.27.4
 
 replace github.com/googleapis/go-gorm-spanner => ../
 
@@ -12,10 +12,10 @@ require (
 	github.com/docker/docker v28.5.2+incompatible
 	github.com/docker/go-connections v0.8.2
 	github.com/google/uuid v1.6.0
-	github.com/googleapis/go-gorm-spanner v1.10.2
+	github.com/googleapis/go-gorm-spanner v1.10.3
 	github.com/googleapis/go-sql-spanner v1.28.0
 	github.com/stretchr/testify v1.12.1
-	google.golang.org/api v0.314.0
+	google.golang.org/api v0.315.0
 	google.golang.org/grpc v1.85.0
 	google.golang.org/protobuf v1.36.12
 	gorm.io/driver/postgres v1.6.3
