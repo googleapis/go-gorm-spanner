@@ -25,17 +25,17 @@ import (
 	"testing"
 	"time"
 
+	"cloud.google.com/go/civil"
 	"cloud.google.com/go/spanner"
 	database "cloud.google.com/go/spanner/admin/database/apiv1"
+	"cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
 	"github.com/google/uuid"
 	_ "github.com/googleapis/go-sql-spanner"
 	spannerdriver "github.com/googleapis/go-sql-spanner"
 	"google.golang.org/grpc/codes"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
 	spannergorm "github.com/googleapis/go-gorm-spanner"
-	databasepb "google.golang.org/genproto/googleapis/spanner/admin/database/v1"
 )
 
 var benchmarkProjectId, benchmarkInstanceId, benchmarkDatabaseId string
@@ -80,7 +80,7 @@ func (s *Singer) toMutation() (*spanner.Mutation, error) {
 type Album struct {
 	BaseModel
 	Title        string
-	ReleaseDate  datatypes.Date
+	ReleaseDate  civil.Date `gorm:"type:date"`
 	CoverPicture []byte
 	SingerId     string
 	Singer       Singer

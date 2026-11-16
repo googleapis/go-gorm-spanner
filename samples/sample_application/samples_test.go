@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
-	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
@@ -36,22 +35,34 @@ type sampleFunc func(w io.Writer, db *gorm.DB) error
 
 func TestIntegration_Sample(t *testing.T) {
 	cleanup, err := testutil.InitIntegrationTests()
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer cleanup()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
 	defer cancel()
 	dsn, cleanup, err := testutil.CreateTestDB(ctx, databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer cleanup()
 	// Open db.
 	db, err := gorm.Open(spannergorm.New(spannergorm.Config{
 		DriverName: "spanner",
 		DSN:        dsn,
 	}), &gorm.Config{PrepareStmt: true, IgnoreRelationshipsWhenMigrating: true, Logger: logger.Default.LogMode(logger.Error)})
-	require.NoError(t, err)
-	require.NoError(t, CreateInterleavedTablesIfNotExist(os.Stdout, db))
-	require.NoError(t, db.AutoMigrate(&Venue{}, &Concert{}))
-	require.NoError(t, DeleteAllData(db))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := CreateInterleavedTablesIfNotExist(os.Stdout, db); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.AutoMigrate(&Venue{}, &Concert{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := DeleteAllData(db); err != nil {
+		t.Fatal(err)
+	}
 	var out string
 	out = runSample(t, CreateRandomSingersAndAlbums, db, "failed to create singers and albums")
 	assertContains(t, out, "Created random singers and albums")
