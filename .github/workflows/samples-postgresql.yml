@@ -2,35 +2,39 @@ on:
   pull_request:
     branches: [ main ]
 name: Run Samples for PostgreSQL
+permissions:
+  contents: read
 jobs:
   samples:
     strategy:
       matrix:
-        go-version: [1.25.x, 1.26.x]
+        go-version: [1.26.x, 1.27.x]
     runs-on: ubuntu-latest
     steps:
       - name: Install Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ matrix.go-version }}
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Pre-pull Spanner Emulator image
         run: |
           for i in {1..5}; do
             docker pull gcr.io/cloud-spanner-emulator/emulator:latest && break || sleep 5
           done
       - name: Run Hello World
-        working-directory: ./postgresql/samples/helloworld
+        working-directory: ./samples/postgresql/helloworld
         run: go run main.go
       - name: Run Quickstart
-        working-directory: ./postgresql/samples/quickstart
+        working-directory: ./samples/postgresql/quickstart
         run: go run main.go
       - name: Run sample application
-        working-directory: ./postgresql/samples
+        working-directory: ./samples/postgresql
         run: go run run_sample.go
       - name: Run snippets
-        working-directory: ./postgresql/samples
+        working-directory: ./samples/postgresql
         run: |
           for filename in snippets/*.go; do
             name=${filename##*/}

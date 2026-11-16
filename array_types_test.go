@@ -25,8 +25,8 @@ import (
 	"cloud.google.com/go/civil"
 	"cloud.google.com/go/spanner"
 	"cloud.google.com/go/spanner/apiv1/spannerpb"
-	structpb "github.com/golang/protobuf/ptypes/struct"
 	"github.com/googleapis/go-sql-spanner/testutil"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 type arrayEntity struct {

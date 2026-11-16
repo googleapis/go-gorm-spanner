@@ -21,18 +21,18 @@ import (
 	"cloud.google.com/go/civil"
 	"cloud.google.com/go/spanner"
 	spannerpg "github.com/googleapis/go-gorm-spanner/postgresql"
-	"github.com/googleapis/go-gorm-spanner/postgresql/samples/snippets/sample_model"
+	"github.com/googleapis/go-gorm-spanner/samples/postgresql/snippets/sample_model"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
-// AutoSaveAssociations shows how to create a model with one or more associated
-// models in one Create call. gorm uses an insert-or-update statement for these
-// calls.
+// InterleavedTables shows how to map and use interleaved tables with gorm.
+// Interleaved tables can be mapped as a 'has many' (https://gorm.io/docs/has_many.html)
+// association in gorm.
 //
-// Execute the sample with the command `go run run_sample.go auto_save_associations`
+// Execute the sample with the command `go run run_sample.go interleaved_tables`
 // from the samples directory.
-func AutoSaveAssociations(projectId, instanceId, databaseId string) error {
+func InterleavedTables(projectId, instanceId, databaseId string) error {
 	db, err := gorm.Open(spannerpg.New(postgres.Config{
 		DSN: fmt.Sprintf("projects/%s/instances/%s/databases/%s", projectId, instanceId, databaseId),
 	}), &gorm.Config{PrepareStmt: true})
@@ -40,7 +40,7 @@ func AutoSaveAssociations(projectId, instanceId, databaseId string) error {
 		return fmt.Errorf("failed to open database connection: %v\n", err)
 	}
 
-	// Insert a singer and a few albums.
+	// Insert a singer, an album, and a few tracks belonging to that album.
 	// gorm allows us to create these in one go by creating the model hierarchy
 	// directly in code, and then submitting the top-level model to the Create
 	// function.
@@ -52,14 +52,17 @@ func AutoSaveAssociations(projectId, instanceId, databaseId string) error {
 			{
 				Title:       "Fine Stuff",
 				ReleaseDate: spanner.NullDate{Date: civil.Date{Year: 2024, Month: 11, Day: 11}, Valid: true},
-			},
-			{
-				Title:       "Better Things",
-				ReleaseDate: spanner.NullDate{Date: civil.Date{Year: 2023, Month: 1, Day: 30}, Valid: true},
-			},
-			{
-				Title:       "All Good",
-				ReleaseDate: spanner.NullDate{Date: civil.Date{Year: 2022, Month: 5, Day: 5}, Valid: true},
+				// Track is INTERLEAVED IN PARENT Album.
+				// They share the same primary key prefix (ID).
+				// Track adds a TrackNumber column to the primary key.
+				// The list of tracks can be used as a normal association in gorm.
+				Tracks: []sample_model.Track{
+					{TrackNumber: 1, Title: "This is fine"},
+					{TrackNumber: 2, Title: "Wish it was better"},
+					{TrackNumber: 3, Title: "Probably the best"},
+					{TrackNumber: 4, Title: "Things are getting better"},
+					{TrackNumber: 5, Title: "Why is this still here?"},
+				},
 			},
 		},
 	}
@@ -67,18 +70,25 @@ func AutoSaveAssociations(projectId, instanceId, databaseId string) error {
 	if db.Error != nil {
 		return db.Error
 	}
-
-	// Note that gorm only returns the number of affected rows for the top-level
-	// record, i.e. the number of singers that were inserted.
 	fmt.Printf("Inserted %d singer\n", db.RowsAffected)
 
-	// By loading the singer from the database again, we can see that the albums
-	// were also added to the database.
-	db = db.Debug().Preload("Albums").Find(&singer)
+	// Verify that we can iterate over the tracks of an album as if it were a normal association.
+	// Read the singer from the database.
+	id := singer.ID
+	singer = sample_model.Singer{}
+	singer.ID = id
+	// Load the singer from the database and preload the relevant associations.
+	db = db.Preload("Albums").Preload("Albums.Tracks").Find(&singer)
 	if db.Error != nil {
 		return db.Error
 	}
 	fmt.Printf("Singer %s has %d albums\n", singer.FullName, len(singer.Albums))
+	for _, album := range singer.Albums {
+		fmt.Printf("\tAlbum %s has %d tracks\n", album.Title, len(album.Tracks))
+		for _, track := range album.Tracks {
+			fmt.Printf("\t\t%d: %s\n", track.TrackNumber, track.Title)
+		}
+	}
 
 	return nil
 }
