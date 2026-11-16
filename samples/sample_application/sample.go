@@ -557,7 +557,7 @@ func DeleteRandomTrack(w io.Writer, db *gorm.DB) error {
 	}); err != nil {
 		return fmt.Errorf("failed to delete a random track: %w", err)
 	}
-	_, _ = fmt.Fprintf(w, "Deleted track %q (%q)\n\n", track.ID, track.Title)
+	_, _ = fmt.Fprintf(w, "Deleted track %d (%q)\n\n", track.ID, track.Title)
 	return nil
 }
 
@@ -584,7 +584,7 @@ func DeleteRandomAlbum(w io.Writer, db *gorm.DB) error {
 	}); err != nil {
 		return fmt.Errorf("failed to delete a random album: %w", err)
 	}
-	_, _ = fmt.Fprintf(w, "Deleted album %q (%q)\n\n", album.ID, album.Title)
+	_, _ = fmt.Fprintf(w, "Deleted album %d (%q)\n\n", album.ID, album.Title)
 	return nil
 }
 

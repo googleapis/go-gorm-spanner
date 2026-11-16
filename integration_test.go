@@ -29,7 +29,6 @@ import (
 	"cloud.google.com/go/spanner"
 	"cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
 	"github.com/googleapis/go-gorm-spanner/testutil"
-	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -104,9 +103,9 @@ func TestIntegration_DefaultValue(t *testing.T) {
 	} else if result.Name != "foo" || result.Name2 != "foo" || result.Name3 != "" || result.Age != 18 || !result.Enabled || result.Created.UTC().Format("20060102") != "20000102" {
 		t.Fatalf("Failed to find created data with default data, got %+v", result)
 	}
-	require.Conditionf(t, func() (success bool) {
-		return result.ID > 0
-	}, "ID should be greater than 0")
+	if result.ID <= 0 {
+		t.Fatalf("ID should be greater than 0, got %d", result.ID)
+	}
 }
 
 func TestIntegration_Distinct(t *testing.T) {
@@ -149,18 +148,24 @@ func TestIntegration_Distinct(t *testing.T) {
 
 	var names []string
 	db.Table("users").Where("name like ?", "distinct%").Order("name").Pluck("name", &names)
-	require.True(t, reflect.DeepEqual(names, []string{"distinct", "distinct", "distinct", "distinct-2", "distinct-3"}))
+	if g, w := names, []string{"distinct", "distinct", "distinct", "distinct-2", "distinct-3"}; !reflect.DeepEqual(g, w) {
+		t.Fatalf("names mismatch\nGot:  %v\nWant: %v", g, w)
+	}
 
 	var names1 []string
 	db.Model(&testutil.User{}).Where("name like ?", "distinct%").Distinct().Order("name").Pluck("Name", &names1)
 
-	require.True(t, reflect.DeepEqual(names1, []string{"distinct", "distinct-2", "distinct-3"}))
+	if g, w := names1, []string{"distinct", "distinct-2", "distinct-3"}; !reflect.DeepEqual(g, w) {
+		t.Fatalf("distinct names mismatch\nGot:  %v\nWant: %v", g, w)
+	}
 
 	var names2 []string
 	db.Scopes(func(db *gorm.DB) *gorm.DB {
 		return db.Table("users")
 	}).Where("name like ?", "distinct%").Order("name").Pluck("name", &names2)
-	require.True(t, reflect.DeepEqual(names2, []string{"distinct", "distinct", "distinct", "distinct-2", "distinct-3"}))
+	if g, w := names2, []string{"distinct", "distinct", "distinct", "distinct-2", "distinct-3"}; !reflect.DeepEqual(g, w) {
+		t.Fatalf("scoped names mismatch\nGot:  %v\nWant: %v", g, w)
+	}
 
 	var results []testutil.User
 	if err := db.Distinct("name", "age").Where("name like ?", "distinct%").Order("name, age desc").Find(&results).Error; err != nil {
@@ -177,7 +182,9 @@ func TestIntegration_Distinct(t *testing.T) {
 	if len(results) != len(expects) {
 		t.Fatalf("invalid results length found, expects: %v, got %v", len(expects), len(results))
 	}
-	require.True(t, reflect.DeepEqual(results, expects))
+	if !reflect.DeepEqual(results, expects) {
+		t.Fatalf("results mismatch\nGot:  %v\nWant: %v", results, expects)
+	}
 
 	var count int64
 	if err := db.Model(&testutil.User{}).Where("name like ?", "distinct%").Count(&count).Error; err != nil || count != 5 {

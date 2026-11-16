@@ -11,5 +11,8 @@
     "gomodTidy"
   ],
   "commitMessageAction": "update",
-  "groupName": "all dependencies"
+  "groupName": "all dependencies",
+  "vulnerabilityAlerts": {
+    "groupName": "all dependencies"
+  }
 }
