@@ -2,7 +2,7 @@ module github.com/googleapis/go-gorm-spanner
 
 go 1.26.0
 
-toolchain go1.26.5
+toolchain go1.27.4
 
 require (
 	cloud.google.com/go v0.123.0
@@ -13,7 +13,7 @@ require (
 	github.com/googleapis/gax-go/v2 v2.27.0
 	github.com/googleapis/go-sql-spanner v1.28.0
 	github.com/shopspring/decimal v1.6.0
-	google.golang.org/api v0.314.0
+	google.golang.org/api v0.315.0
 	google.golang.org/grpc v1.85.0
 	google.golang.org/protobuf v1.36.12
 	gorm.io/driver/postgres v1.6.3
