@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.10.4](https://github.com/googleapis/go-gorm-spanner/compare/v1.10.3...v1.10.4) (2026-11-18)
+
+
+### Bug Fixes
+
+* Quote sequence identifiers during table migration ([#273](https://github.com/googleapis/go-gorm-spanner/issues/273)) ([32417fd](https://github.com/googleapis/go-gorm-spanner/commit/32417fdd6ccbe1d4a7096afd487aa2dcfe0d99a4))
+* Update all dependencies ([#261](https://github.com/googleapis/go-gorm-spanner/issues/261)) ([0fdf6b6](https://github.com/googleapis/go-gorm-spanner/commit/0fdf6b6ff44204f4906c7bf89fd95bb2e6279332))
+* Update all dependencies ([#277](https://github.com/googleapis/go-gorm-spanner/issues/277)) ([2ce0fdd](https://github.com/googleapis/go-gorm-spanner/commit/2ce0fdd7b541ce7f07a8aa2b0620baef1ab2c32e))
+
 ## [1.10.3](https://github.com/googleapis/go-gorm-spanner/compare/v1.10.2...v1.10.3) (2026-11-13)
 
 
