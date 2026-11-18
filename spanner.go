@@ -19,6 +19,8 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/callbacks"
@@ -207,52 +209,196 @@ func (dialector Dialector) BindVarTo(writer clause.Writer, stmt *gorm.Statement,
 	writer.WriteByte('?')
 }
 
-func (dialector Dialector) QuoteTo(writer clause.Writer, str string) {
-	var (
-		underQuoted, selfQuoted bool
-		continuousBacktick      int8
-		shiftDelimiter          int8
-	)
+// needsGoogleSQLEscape reports whether character must be backslash-escaped inside a
+// backtick-quoted GoogleSQL identifier.
+func needsGoogleSQLEscape(character byte) bool {
+	return character == '`' || character == '\\' || character < 0x20 || character == 0x7f
+}
 
-	for _, v := range []byte(str) {
-		switch v {
-		case '`':
-			continuousBacktick++
-			if continuousBacktick == 2 {
-				writer.WriteString("``")
-				continuousBacktick = 0
-			}
-		case '.':
-			if continuousBacktick > 0 || !selfQuoted {
-				shiftDelimiter = 0
-				underQuoted = false
-				continuousBacktick = 0
-				writer.WriteString("`")
-			}
-			writer.WriteByte(v)
-			continue
-		default:
-			if shiftDelimiter-continuousBacktick <= 0 && !underQuoted {
-				writer.WriteByte('`')
-				underQuoted = true
-				if selfQuoted = continuousBacktick > 0; selfQuoted {
-					continuousBacktick -= 1
-				}
-			}
+func isHexDigit(character byte) bool {
+	return ('0' <= character && character <= '9') ||
+		('a' <= character && character <= 'f') ||
+		('A' <= character && character <= 'F')
+}
 
-			for ; continuousBacktick > 0; continuousBacktick -= 1 {
-				writer.WriteString("``")
-			}
+func isOctalDigit(character byte) bool {
+	return '0' <= character && character <= '7'
+}
 
-			writer.WriteByte(v)
+func allHexDigits(str string) bool {
+	for index := 0; index < len(str); index++ {
+		if !isHexDigit(str[index]) {
+			return false
 		}
-		shiftDelimiter++
+	}
+	return true
+}
+
+// isValidUnicodeEscapeHex reports whether hexDigits represents a valid Unicode scalar value
+// in GoogleSQL (excluding UTF-16 surrogates 0xD800..0xDFFF and values > 0x10FFFF).
+func isValidUnicodeEscapeHex(hexDigits string) bool {
+	if !allHexDigits(hexDigits) {
+		return false
+	}
+	codePoint, err := strconv.ParseUint(hexDigits, 16, 64)
+	return err == nil && codePoint <= 0x10FFFF && !(0xD800 <= codePoint && codePoint <= 0xDFFF)
+}
+
+// validGoogleSQLEscapeLength returns the byte length of a valid GoogleSQL escape sequence
+// starting at str[backslashIndex], ensuring at least one byte remains afterwards for the
+// closing backtick.
+func validGoogleSQLEscapeLength(str string, backslashIndex int) (int, bool) {
+	if backslashIndex+2 >= len(str) {
+		return 0, false
+	}
+	switch str[backslashIndex+1] {
+	case 'a', 'b', 'f', 'n', 'r', 't', 'v', '\\', '?', '"', '\'', '`':
+		// Single-character escapes: bell, backspace, form feed, newline, CR, tab, vertical tab, backslash, ?, quotes, backtick.
+		return 2, true
+	case 'x', 'X':
+		// Two-digit hexadecimal byte escape: \xHH or \XHH.
+		if backslashIndex+4 < len(str) && allHexDigits(str[backslashIndex+2:backslashIndex+4]) {
+			return 4, true
+		}
+	case 'u':
+		// Four-digit Unicode scalar value escape: \uHHHH (excluding UTF-16 surrogates).
+		if backslashIndex+6 < len(str) && isValidUnicodeEscapeHex(str[backslashIndex+2:backslashIndex+6]) {
+			return 6, true
+		}
+	case 'U':
+		// Eight-digit Unicode scalar value escape: \UHHHHHHHH (<= 0x10FFFF, excluding UTF-16 surrogates).
+		if backslashIndex+10 < len(str) && isValidUnicodeEscapeHex(str[backslashIndex+2:backslashIndex+10]) {
+			return 10, true
+		}
+	case '0', '1', '2', '3':
+		// Three-digit octal byte escape: \ooo (leading digit 0-3 ensures value <= 0377 / 255).
+		if backslashIndex+4 < len(str) && isOctalDigit(str[backslashIndex+2]) && isOctalDigit(str[backslashIndex+3]) {
+			return 4, true
+		}
+	}
+	return 0, false
+}
+
+// writeEscapedByte writes character to writer, escaping backticks, backslashes,
+// and ASCII control characters according to Cloud Spanner GoogleSQL rules.
+func writeEscapedByte(writer clause.Writer, character byte) {
+	switch character {
+	case '`':
+		writer.WriteString("\\`")
+	case '\\':
+		writer.WriteString("\\\\")
+	case '\a':
+		writer.WriteString("\\a")
+	case '\b':
+		writer.WriteString("\\b")
+	case '\f':
+		writer.WriteString("\\f")
+	case '\n':
+		writer.WriteString("\\n")
+	case '\r':
+		writer.WriteString("\\r")
+	case '\t':
+		writer.WriteString("\\t")
+	case '\v':
+		writer.WriteString("\\v")
+	default:
+		const hexDigits = "0123456789abcdef"
+		writer.WriteString("\\x")
+		writer.WriteByte(hexDigits[character>>4])
+		writer.WriteByte(hexDigits[character&0x0f])
+	}
+}
+
+// findSegmentEnd returns the end byte index of the dot-separated identifier segment
+// starting at start, and whether the segment is already a validly backtick-quoted and
+// escaped GoogleSQL identifier (non-empty, with no unescaped backticks, control characters,
+// or invalid escape sequences).
+func findSegmentEnd(str string, start int) (int, bool) {
+	if str[start] == '`' {
+		for index := start + 1; index < len(str); index++ {
+			character := str[index]
+			if character == '`' {
+				if index > start+1 && (index+1 == len(str) || str[index+1] == '.') {
+					return index + 1, true
+				}
+				break
+			}
+			if character == '\\' {
+				escapeLen, ok := validGoogleSQLEscapeLength(str, index)
+				if !ok {
+					break
+				}
+				index += escapeLen - 1
+				continue
+			}
+			if character < 0x20 || character == 0x7f {
+				break
+			}
+		}
+	}
+	if dotIndex := strings.IndexByte(str[start:], '.'); dotIndex >= 0 {
+		return start + dotIndex, false
+	}
+	return len(str), false
+}
+
+// writeQuotedIdentifierSegment writes a single identifier segment enclosed in backticks,
+// escaping any internal backticks, backslashes, and control characters while flushing runs
+// of unescaped bytes in bulk.
+func writeQuotedIdentifierSegment(writer clause.Writer, segment string) {
+	writer.WriteByte('`')
+	lastFlushed := 0
+	for index := 0; index < len(segment); index++ {
+		if needsGoogleSQLEscape(segment[index]) {
+			if index > lastFlushed {
+				writer.WriteString(segment[lastFlushed:index])
+			}
+			writeEscapedByte(writer, segment[index])
+			lastFlushed = index + 1
+		}
+	}
+	if lastFlushed < len(segment) {
+		writer.WriteString(segment[lastFlushed:])
+	}
+	writer.WriteByte('`')
+}
+
+// QuoteTo writes an identifier to writer quoted and escaped according to Cloud Spanner GoogleSQL rules.
+// GoogleSQL uses backticks (`) for quoted identifiers. Internal backticks are escaped with a backslash (\`),
+// backslashes are escaped as \\, and control characters use standard GoogleSQL escape sequences.
+// Validly quoted and escaped segments are preserved idempotently without double-escaping.
+func (dialector Dialector) QuoteTo(writer clause.Writer, str string) {
+	if len(str) == 0 {
+		// GoogleSQL rejects empty backtick identifiers (``), so emit nothing for empty inputs.
+		return
+	}
+	if str == "*" {
+		writer.WriteString("*")
+		return
+	}
+	if strings.HasSuffix(str, ".*") {
+		// Quote the schema/table prefix and preserve the trailing projection wildcard unquoted.
+		dialector.QuoteTo(writer, str[:len(str)-2])
+		writer.WriteString(".*")
+		return
 	}
 
-	if continuousBacktick > 0 && !selfQuoted {
-		writer.WriteString("``")
+	for index := 0; index < len(str); {
+		if str[index] == '.' {
+			writer.WriteByte('.')
+			index++
+			continue
+		}
+
+		segmentEnd, alreadyQuoted := findSegmentEnd(str, index)
+		segment := str[index:segmentEnd]
+		if alreadyQuoted {
+			writer.WriteString(segment)
+		} else {
+			writeQuotedIdentifierSegment(writer, segment)
+		}
+		index = segmentEnd
 	}
-	writer.WriteString("`")
 }
 
 func (dialector Dialector) Explain(sql string, vars ...interface{}) string {
