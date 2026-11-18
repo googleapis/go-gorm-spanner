@@ -24,9 +24,12 @@ import (
 	"cloud.google.com/go/spanner"
 	"cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
 	"cloud.google.com/go/spanner/apiv1/spannerpb"
+	"cloud.google.com/go/spanner/spansql"
 	spannerdriver "github.com/googleapis/go-sql-spanner"
 	"github.com/googleapis/go-sql-spanner/testutil"
 	"google.golang.org/api/option"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -56,6 +59,14 @@ type test struct {
 	Test     string
 	SingerID uint
 	Singer   *singer
+}
+
+type injectionTableNameModel struct {
+	ID uint `gorm:"primarykey"`
+}
+
+func (injectionTableNameModel) TableName() string {
+	return "singers); DROP TABLE users; --"
 }
 
 func TestMigrate(t *testing.T) {
@@ -115,12 +126,12 @@ func TestMigrate(t *testing.T) {
 	}
 	index++
 	if g, w := request.GetStatements()[index],
-		`CREATE SEQUENCE IF NOT EXISTS overridden_sequence_name OPTIONS (sequence_kind = "bit_reversed_positive")`; g != w {
+		"CREATE SEQUENCE IF NOT EXISTS `overridden_sequence_name` OPTIONS (sequence_kind = \"bit_reversed_positive\")"; g != w {
 		t.Fatalf("create albums sequence statement text mismatch\n Got: %s\nWant: %s", g, w)
 	}
 	index++
 	if g, w := request.GetStatements()[index],
-		"CREATE TABLE `tests` (`id` INT64 DEFAULT (GET_NEXT_SEQUENCE_VALUE(Sequence overridden_sequence_name)),"+
+		"CREATE TABLE `tests` (`id` INT64 DEFAULT (GET_NEXT_SEQUENCE_VALUE(Sequence `overridden_sequence_name`)),"+
 			"`test` STRING(MAX),`singer_id` INT64,"+
 			"CONSTRAINT `fk_tests_singer` FOREIGN KEY (`singer_id`) REFERENCES `singers`(`id`)) "+
 			"PRIMARY KEY (`id`)"; g != w {
@@ -262,13 +273,13 @@ func TestDisableIdentityColumns(t *testing.T) {
 	}
 	index := 0
 	if g, w := request.GetStatements()[index],
-		`CREATE SEQUENCE IF NOT EXISTS singers_seq OPTIONS (sequence_kind = "bit_reversed_positive")`; g != w {
+		"CREATE SEQUENCE IF NOT EXISTS `singers_seq` OPTIONS (sequence_kind = \"bit_reversed_positive\")"; g != w {
 		t.Fatalf("create albums sequence statement text mismatch\n Got: %s\nWant: %s", g, w)
 	}
 	index++
 	if g, w := request.GetStatements()[index],
 		"CREATE TABLE `singers` ("+
-			"`id` INT64 DEFAULT (GET_NEXT_SEQUENCE_VALUE(Sequence singers_seq)),`created_at` TIMESTAMP,`updated_at` TIMESTAMP,`deleted_at` TIMESTAMP,"+
+			"`id` INT64 DEFAULT (GET_NEXT_SEQUENCE_VALUE(Sequence `singers_seq`)),`created_at` TIMESTAMP,`updated_at` TIMESTAMP,`deleted_at` TIMESTAMP,"+
 			"`first_name` STRING(MAX),`last_name` STRING(MAX),`full_name` STRING(MAX),`active` BOOL) "+
 			"PRIMARY KEY (`id`)"; g != w {
 		t.Fatalf("create singers statement text mismatch\n Got: %s\nWant: %s", g, w)
@@ -277,6 +288,228 @@ func TestDisableIdentityColumns(t *testing.T) {
 	if g, w := request.GetStatements()[index],
 		"CREATE INDEX `idx_singers_deleted_at` ON `singers`(`deleted_at`)"; g != w {
 		t.Fatalf("create idx_singers_deleted_at statement text mismatch\n Got: %s\nWant: %s", g, w)
+	}
+}
+
+func setupDisabledIdentityMigratorTest(t *testing.T) (*gorm.DB, *testutil.MockedSpannerInMemTestServer, func()) {
+	t.Helper()
+
+	server, _, serverTeardown := setupMockedTestServer(t)
+	db, server, teardown := setupTestGormConnectionWithDialector(t, server, serverTeardown, New(Config{
+		DriverName:          "spanner",
+		DSN:                 fmt.Sprintf("%s/projects/p/instances/i/databases/d?useplaintext=true", server.Address),
+		DefaultSequenceKind: DisableIdentityColumns,
+	}))
+
+	anyProto, err := anypb.New(&emptypb.Empty{})
+	if err != nil {
+		teardown()
+		t.Fatalf("failed to marshal empty proto: %v", err)
+	}
+	server.TestDatabaseAdmin.SetResps([]proto.Message{
+		&longrunningpb.Operation{
+			Name:   "test-operation-1",
+			Done:   true,
+			Result: &longrunningpb.Operation_Response{Response: anyProto},
+		},
+		&longrunningpb.Operation{
+			Name:   "test-operation-2",
+			Done:   true,
+			Result: &longrunningpb.Operation_Response{Response: anyProto},
+		},
+	})
+	return db, server, teardown
+}
+
+func TestCreateTable_SequenceQuoting(t *testing.T) {
+	t.Parallel()
+
+	type keywordSequenceModel struct {
+		ID uint `gorm:"primarykey" gorm_sequence_name:"select"`
+	}
+	type specialCharsSequenceModel struct {
+		ID uint `gorm:"primarykey" gorm_sequence_name:"my-seq?1"`
+	}
+	type currentTableSentinelSequenceModel struct {
+		ID uint `gorm:"primarykey" gorm_sequence_name:"~~~ct~~~"`
+	}
+	type schemaQualifiedSequenceModel struct {
+		ID uint `gorm:"primarykey" gorm_sequence_name:"myschema.myseq"`
+	}
+	type tableSequenceModel struct {
+		ID uint `gorm:"primarykey"`
+	}
+
+	tests := []struct {
+		name               string
+		tableName          string
+		model              interface{}
+		wantSequenceName   string
+		wantQuotedSequence string
+		wantQuotedTable    string
+		skipSpanSQL        bool
+	}{
+		{
+			name:               "hyphenated table name",
+			tableName:          "my-singers",
+			model:              &tableSequenceModel{},
+			wantSequenceName:   "my-singers_seq",
+			wantQuotedSequence: "`my-singers_seq`",
+			wantQuotedTable:    "`my-singers`",
+		},
+		{
+			name:               "injection payload in table name",
+			tableName:          "singers);DROP",
+			model:              &tableSequenceModel{},
+			wantSequenceName:   "singers);DROP_seq",
+			wantQuotedSequence: "`singers);DROP_seq`",
+			wantQuotedTable:    "`singers);DROP`",
+		},
+		{
+			name:               "injection payload in TableName method",
+			model:              &injectionTableNameModel{},
+			wantSequenceName:   "singers); DROP TABLE users; --_seq",
+			wantQuotedSequence: "`singers); DROP TABLE users; --_seq`",
+			wantQuotedTable:    "`singers); DROP TABLE users; --`",
+		},
+		{
+			name:               "reserved keyword in sequence tag",
+			model:              &keywordSequenceModel{},
+			wantSequenceName:   "select",
+			wantQuotedSequence: "`select`",
+			wantQuotedTable:    "`keyword_sequence_models`",
+		},
+		{
+			name:               "hyphen and question mark in sequence tag",
+			model:              &specialCharsSequenceModel{},
+			wantSequenceName:   "my-seq?1",
+			wantQuotedSequence: "`my-seq?1`",
+			wantQuotedTable:    "`special_chars_sequence_models`",
+		},
+		{
+			name:               "current table sentinel in sequence tag",
+			model:              &currentTableSentinelSequenceModel{},
+			wantSequenceName:   "~~~ct~~~",
+			wantQuotedSequence: "`~~~ct~~~`",
+			wantQuotedTable:    "`current_table_sentinel_sequence_models`",
+		},
+		{
+			name:               "schema-qualified sequence tag",
+			model:              &schemaQualifiedSequenceModel{},
+			wantSequenceName:   "myschema.myseq",
+			wantQuotedSequence: "`myschema`.`myseq`",
+			wantQuotedTable:    "`schema_qualified_sequence_models`",
+			skipSpanSQL:        true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			db, server, teardown := setupDisabledIdentityMigratorTest(t)
+			defer teardown()
+
+			migratorDB := db
+			if tc.tableName != "" {
+				migratorDB = db.Table(tc.tableName)
+			}
+			if err := migratorDB.Migrator().CreateTable(tc.model); err != nil {
+				t.Fatalf("CreateTable failed: %v", err)
+			}
+
+			requests := server.TestDatabaseAdmin.Reqs()
+			if g, w := len(requests), 2; g != w {
+				t.Fatalf("request count mismatch\nGot:  %v\nWant: %v", g, w)
+			}
+			createSeqReq := requests[0].(*databasepb.UpdateDatabaseDdlRequest)
+			if g, w := len(createSeqReq.GetStatements()), 1; g != w {
+				t.Fatalf("create sequence statement count mismatch\nGot:  %v\nWant: %v", g, w)
+			}
+			createTableReq := requests[1].(*databasepb.UpdateDatabaseDdlRequest)
+			if g, w := len(createTableReq.GetStatements()), 1; g != w {
+				t.Fatalf("create table statement count mismatch\nGot:  %v\nWant: %v", g, w)
+			}
+
+			createSeqSQL := createSeqReq.GetStatements()[0]
+			wantCreateSequence := fmt.Sprintf(
+				`CREATE SEQUENCE IF NOT EXISTS %s OPTIONS (sequence_kind = "bit_reversed_positive")`,
+				tc.wantQuotedSequence,
+			)
+			if g, w := createSeqSQL, wantCreateSequence; g != w {
+				t.Errorf("CREATE SEQUENCE mismatch\nGot:  %v\nWant: %v", g, w)
+			}
+
+			createTableSQL := createTableReq.GetStatements()[0]
+			wantCreateTable := fmt.Sprintf(
+				"CREATE TABLE %s (`id` INT64 DEFAULT (GET_NEXT_SEQUENCE_VALUE(Sequence %s))) PRIMARY KEY (`id`)",
+				tc.wantQuotedTable,
+				tc.wantQuotedSequence,
+			)
+			if g, w := createTableSQL, wantCreateTable; g != w {
+				t.Errorf("CREATE TABLE mismatch\nGot:  %v\nWant: %v", g, w)
+			}
+
+			if tc.skipSpanSQL {
+				return
+			}
+
+			ddlStmt, err := spansql.ParseDDLStmt(createSeqSQL)
+			if err != nil {
+				t.Fatalf("spansql.ParseDDLStmt failed for CREATE SEQUENCE: %v", err)
+			}
+			createSeq, ok := ddlStmt.(*spansql.CreateSequence)
+			if !ok {
+				t.Fatalf("expected *spansql.CreateSequence, got %T", ddlStmt)
+			}
+			if g, w := string(createSeq.Name), tc.wantSequenceName; g != w {
+				t.Errorf("parsed sequence name mismatch\nGot:  %v\nWant: %v", g, w)
+			}
+
+			if _, err := spansql.ParseDDLStmt(createTableSQL); err != nil {
+				t.Fatalf("spansql.ParseDDLStmt failed for CREATE TABLE: %v", err)
+			}
+		})
+	}
+}
+
+func TestCreateTable_CreateSequenceError(t *testing.T) {
+	t.Parallel()
+
+	type sequenceErrorModel struct {
+		ID uint `gorm:"primarykey" gorm_sequence_name:"failing_seq"`
+	}
+
+	db, server, teardown := setupDisabledIdentityMigratorTest(t)
+	defer teardown()
+
+	wantErr := status.Error(codes.InvalidArgument, "sequence creation failed")
+	server.TestDatabaseAdmin.SetErr(wantErr)
+
+	err := db.Migrator().CreateTable(&sequenceErrorModel{})
+	if g, w := spanner.ErrCode(err), codes.InvalidArgument; g != w {
+		t.Fatalf("CreateTable error code mismatch\nGot:  %v (%v)\nWant: %v", g, err, w)
+	}
+
+	requests := server.TestDatabaseAdmin.Reqs()
+	if g, w := len(requests), 1; g != w {
+		t.Fatalf("request count mismatch\nGot:  %v\nWant: %v", g, w)
+	}
+	request := requests[0].(*databasepb.UpdateDatabaseDdlRequest)
+	if g, w := len(request.GetStatements()), 1; g != w {
+		t.Fatalf("statement count mismatch\nGot:  %v\nWant: %v", g, w)
+	}
+	wantStmt := `CREATE SEQUENCE IF NOT EXISTS ` + "`failing_seq`" + ` OPTIONS (sequence_kind = "bit_reversed_positive")`
+	if g, w := request.GetStatements()[0], wantStmt; g != w {
+		t.Errorf("statement mismatch\nGot:  %v\nWant: %v", g, w)
+	}
+
+	stmt := db.Session(&gorm.Session{}).Statement
+	if err := stmt.Parse(&sequenceErrorModel{}); err != nil {
+		t.Fatalf("failed to parse model schema: %v", err)
+	}
+	if g, w := stmt.Schema.LookUpField("ID").DefaultValue, ""; g != w {
+		t.Errorf("DefaultValue mismatch after failed CreateTable\nGot:  %q\nWant: %q", g, w)
 	}
 }
 
