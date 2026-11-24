@@ -254,6 +254,25 @@ if !ok {
 statements, err := migrator.AutoMigrateDryRun(tables...)
 ```
 
+## Manual DDL Batching
+`AutoMigrate` and `AutoMigrateDryRun` automatically run DDL batches on a dedicated connection. If you want to batch
+individual migrator calls manually using `SpannerMigrator.StartBatchDDL`, `RunBatch`, and `AbortBatch`, wrap them in
+`db.Connection(...)` (or pass a `*sql.Conn` via `Config{Conn: conn}`):
+
+```go
+err := db.Connection(func(tx *gorm.DB) error {
+    m := tx.Migrator().(spannergorm.SpannerMigrator)
+    if err := m.StartBatchDDL(); err != nil {
+        return err
+    }
+    defer func() { _ = m.AbortBatch() }()
+    if err := m.CreateTable(&singer{}, &album{}); err != nil {
+        return err
+    }
+    return m.RunBatch()
+})
+```
+
 ## Limitations
 The Spanner `gorm` dialect has the following known limitations:
 
@@ -262,6 +281,7 @@ The Spanner `gorm` dialect has the following known limitations:
 | Nested transactions                                                                            | Nested transactions and savepoints are not supported. It is therefore recommended to set the configuration option `DisableNestedTransaction: true,`                                                                      |
 | [gorm.Automigrate](https://gorm.io/docs/migration.html#Auto-Migration) with interleaved tables | [Interleaved tables](samples/sample_application) are supported by the Spanner `gorm` dialect, but Auto-Migration does not support interleaved tables. It is therefore recommended to create interleaved tables manually. |
 | [Spanner stale reads](https://cloud.google.com/spanner/docs/reads#go)                          | Stale reads are not supported by gorm.                                                                                                                                                                                   |
+| Manual DDL batching                                                                            | Calling `SpannerMigrator.StartBatchDDL` directly requires a dedicated connection via `db.Connection(...)` or `Config{Conn: conn}`.                                                                                       |
 
 For the complete list of the limitations, see the [Spanner GORM limitations](/docs/limitations.md).
 

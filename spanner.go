@@ -15,7 +15,6 @@
 package gorm
 
 import (
-	"context"
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
@@ -182,15 +181,6 @@ func (dialector Dialector) DefaultValueOf(field *schema.Field) clause.Expression
 }
 
 func (dialector Dialector) Migrator(db *gorm.DB) gorm.Migrator {
-	var conn *sql.Conn
-	if c, ok := db.ConnPool.(*sql.Conn); ok && c != nil {
-		conn = c
-	} else {
-		sqlDB, _ := db.DB()
-		conn, _ = sqlDB.Conn(context.Background())
-	}
-	db.ConnPool = conn
-	db.Statement.ConnPool = conn
 	return spannerMigrator{
 		Migrator: migrator.Migrator{
 			Config: migrator.Config{
