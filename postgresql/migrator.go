@@ -234,9 +234,51 @@ func (m spannerPostgresMigrator) dropTableDependencies(tx *gorm.DB, stmt *gorm.S
 	return nil
 }
 
+func dropConstraintWithSchema(tx *gorm.DB, tableSchema, tableName, constraintName string) error {
+	return tx.Exec(
+		"ALTER TABLE ?.? DROP CONSTRAINT ?",
+		clause.Table{Name: tableSchema},
+		clause.Table{Name: tableName},
+		clause.Column{Name: constraintName},
+	).Error
+}
+
+func (m spannerPostgresMigrator) resolveConstraintSchemaAndTable(stmt *gorm.Statement, constraint schema.ConstraintInterface, table string) (interface{}, interface{}) {
+	schemaStmt := stmt
+	relatedTable := table != stmt.Table
+	if c, ok := constraint.(*schema.Constraint); ok && c.Schema != nil && c.Schema != stmt.Schema {
+		relatedTable = true
+	}
+	if relatedTable {
+		// When the constraint belongs to a related or join table rather than the
+		// model passed in (e.g., HasMany on a schema-qualified parent), do not let
+		// CurrentSchema fall back to the parent's stmt.TableExpr schema.
+		schemaStmt = &gorm.Statement{}
+	}
+	return m.CurrentSchema(schemaStmt, table)
+}
+
+// DropConstraint drops a constraint while preserving the schema qualification from stmt.TableExpr when applicable.
+func (m spannerPostgresMigrator) DropConstraint(value interface{}, name string) error {
+	return m.RunWithValue(value, func(stmt *gorm.Statement) error {
+		// Mirror GORM's base Migrator.DropConstraint by resolving a field, relation, or
+		// constraint name via GORM's built-in GuessConstraintInterfaceAndTable helper,
+		// while preserving schema qualification (which base DropConstraint drops).
+		constraint, table := m.GuessConstraintInterfaceAndTable(stmt, name)
+		if constraint != nil {
+			name = constraint.GetName()
+		}
+		tableSchema, tableName := m.resolveConstraintSchemaAndTable(stmt, constraint, table)
+		if schemaName, ok := tableSchema.(string); ok {
+			return dropConstraintWithSchema(m.DB, schemaName, fmt.Sprint(tableName), name)
+		}
+		return m.DB.Exec("ALTER TABLE ? DROP CONSTRAINT ?", clause.Table{Name: table}, clause.Column{Name: name}).Error
+	})
+}
+
 func (m spannerPostgresMigrator) dropForeignKeysReferencingTable(tx *gorm.DB, stmt *gorm.Statement) error {
 	currentSchema, curTable := m.CurrentSchema(stmt, stmt.Table)
-	fk := m.queryRawWithTx(tx, "select tc.table_name, ctu.constraint_name "+
+	fk := m.queryRawWithTx(tx, "select tc.table_schema, tc.table_name, ctu.constraint_name "+
 		"from information_schema.constraint_table_usage ctu "+
 		"inner join information_schema.table_constraints tc using (constraint_catalog, constraint_schema, constraint_name)"+
 		"WHERE ctu.table_schema = ? AND ctu.table_name = ? AND tc.constraint_type in ('FOREIGN KEY')", currentSchema, curTable)
@@ -249,11 +291,11 @@ func (m spannerPostgresMigrator) dropForeignKeysReferencingTable(tx *gorm.DB, st
 	}
 	defer func() { _ = rows.Close() }()
 	for rows.Next() {
-		var tableName, constraintName string
-		if err := rows.Scan(&tableName, &constraintName); err != nil {
+		var tableSchema, tableName, constraintName string
+		if err := rows.Scan(&tableSchema, &tableName, &constraintName); err != nil {
 			return err
 		}
-		if err := m.DropConstraint(tableName, constraintName); err != nil {
+		if err := dropConstraintWithSchema(tx, tableSchema, tableName, constraintName); err != nil {
 			return err
 		}
 	}
@@ -274,13 +316,20 @@ func (m spannerPostgresMigrator) dropTableIndexes(tx *gorm.DB, stmt *gorm.Statem
 		return err
 	}
 	defer func() { _ = rows.Close() }()
+	schemaName, hasSchema := currentSchema.(string)
 	for rows.Next() {
 		var name string
 		if err := rows.Scan(&name); err != nil {
 			return err
 		}
-		if err := m.DropIndex(curTable, name); err != nil {
-			return err
+		if hasSchema {
+			if err := tx.Exec("DROP INDEX ?.?", clause.Column{Name: schemaName}, clause.Column{Name: name}).Error; err != nil {
+				return err
+			}
+		} else {
+			if err := tx.Exec("DROP INDEX ?", clause.Column{Name: name}).Error; err != nil {
+				return err
+			}
 		}
 	}
 	if err := rows.Err(); err != nil {
@@ -668,15 +717,17 @@ func (m spannerPostgresMigrator) modifyColumn(stmt *gorm.Statement, field *schem
 func (m spannerPostgresMigrator) isColumnGenerated(value interface{}, field string) bool {
 	var count int64
 	_ = m.RunWithValue(value, func(stmt *gorm.Statement) error {
-		currentSchema := "public"
+		currentSchema, curTable := m.CurrentSchema(stmt, stmt.Table)
 		name := field
-		if field := stmt.Schema.LookUpField(field); field != nil {
-			name = field.DBName
+		if stmt.Schema != nil {
+			if field := stmt.Schema.LookUpField(field); field != nil {
+				name = field.DBName
+			}
 		}
 
 		return m.DB.Raw(
 			"SELECT count(*) FROM INFORMATION_SCHEMA.columns WHERE table_schema = ? AND table_name = ? AND column_name = ? AND generation_expression IS NOT NULL",
-			currentSchema, stmt.Table, name,
+			currentSchema, curTable, name,
 		).Row().Scan(&count)
 	})
 
@@ -695,7 +746,7 @@ func (m spannerPostgresMigrator) HasConstraint(value interface{}, name string) b
 		if constraint != nil {
 			name = constraint.GetName()
 		}
-		currentSchema, curTable := m.CurrentSchema(stmt, table)
+		currentSchema, curTable := m.resolveConstraintSchemaAndTable(stmt, constraint, table)
 
 		return m.queryRaw(
 			"SELECT count(*) FROM INFORMATION_SCHEMA.table_constraints WHERE table_schema = ? AND table_name = ? AND constraint_name = ?",
@@ -742,6 +793,7 @@ INNER JOIN
 WHERE
     ic.ordinal_position is not null
 AND i.spanner_is_managed = 'NO'
+AND i.table_schema = ?
 AND i.table_name = ?
 ORDER BY i.table_schema, i.table_name, i.index_name, ic.ordinal_position
 `
@@ -751,7 +803,8 @@ func (m spannerPostgresMigrator) GetIndexes(value interface{}) ([]gorm.Index, er
 
 	err := m.RunWithValue(value, func(stmt *gorm.Statement) error {
 		result := make([]*postgres.Index, 0)
-		scanErr := m.queryRaw(indexSql, stmt.Table).Scan(&result).Error
+		currentSchema, curTable := m.CurrentSchema(stmt, stmt.Table)
+		scanErr := m.queryRaw(indexSql, currentSchema, curTable).Scan(&result).Error
 		if scanErr != nil {
 			return scanErr
 		}
