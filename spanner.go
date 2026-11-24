@@ -20,14 +20,14 @@ import (
 	"database/sql/driver"
 	"fmt"
 
+	internalcallbacks "github.com/googleapis/go-gorm-spanner/internal/callbacks"
+	_ "github.com/googleapis/go-sql-spanner"
 	"gorm.io/gorm"
 	"gorm.io/gorm/callbacks"
 	"gorm.io/gorm/clause"
 	"gorm.io/gorm/logger"
 	"gorm.io/gorm/migrator"
 	"gorm.io/gorm/schema"
-
-	_ "github.com/googleapis/go-sql-spanner"
 )
 
 type Config struct {
@@ -173,8 +173,7 @@ func insertHandler(c clause.Clause, builder clause.Builder) {
 }
 
 func BeforeUpdate(db *gorm.DB) {
-	// Omit all primary key fields from the SET clause of an UPDATE statement.
-	db.Statement.Omit(db.Statement.Schema.PrimaryFieldDBNames...)
+	internalcallbacks.BeforeUpdate(db)
 }
 
 func (dialector Dialector) DefaultValueOf(field *schema.Field) clause.Expression {
