@@ -1761,7 +1761,9 @@ func setupTestGormConnectionWithDialector(t *testing.T, s *testutil.MockedSpanne
 	}
 
 	return db, s, func() {
-		_ = db
+		if sqlDB, err := db.DB(); err == nil && sqlDB != nil {
+			_ = sqlDB.Close()
+		}
 		serverTeardown()
 	}
 }

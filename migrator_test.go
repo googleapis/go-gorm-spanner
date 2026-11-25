@@ -1216,8 +1216,9 @@ func setupTestGormConnectionWithDialector(t *testing.T, s *testutil.MockedSpanne
 	}
 
 	return db, s, func() {
-		// TODO: Close database?
-		_ = db
+		if sqlDB, err := db.DB(); err == nil && sqlDB != nil {
+			_ = sqlDB.Close()
+		}
 		serverTeardown()
 	}
 }
@@ -1241,8 +1242,9 @@ func setupTestGormConnectionWithCustomConfig(t *testing.T, config spannerdriver.
 	}
 
 	return db, server, func() {
-		// TODO: Close database?
-		_ = db
+		if sqlDB, err := db.DB(); err == nil && sqlDB != nil {
+			_ = sqlDB.Close()
+		}
 		serverTeardown()
 	}
 }
