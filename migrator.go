@@ -179,6 +179,7 @@ func (m spannerMigrator) CreateTable(values ...interface{}) error {
 				createTableSQL          = "CREATE TABLE ? ("
 				values                  = []interface{}{m.CurrentTable(stmt)}
 				hasPrimaryKeyInDataType bool
+				sequenceDefaults        = map[*schema.Field]string{}
 			)
 			for _, f := range stmt.Schema.Fields {
 				if m.shouldUseSequence(f) {
@@ -195,10 +196,7 @@ func (m spannerMigrator) CreateTable(values ...interface{}) error {
 					).Error; err != nil {
 						return err
 					}
-					f.DefaultValue = "GET_NEXT_SEQUENCE_VALUE(Sequence " + quotedSequence + ")"
-					// Reset the default value to nothing after finishing migration.
-					//goland:noinspection GoDeferInLoop
-					defer func() { f.DefaultValue = "" }()
+					sequenceDefaults[f] = "GET_NEXT_SEQUENCE_VALUE(Sequence " + quotedSequence + ")"
 				}
 			}
 			for _, dbName := range stmt.Schema.DBNames {
@@ -206,7 +204,13 @@ func (m spannerMigrator) CreateTable(values ...interface{}) error {
 				if !field.IgnoreMigration {
 					createTableSQL += "? ?"
 					hasPrimaryKeyInDataType = hasPrimaryKeyInDataType || strings.Contains(strings.ToUpper(string(field.DataType)), "PRIMARY KEY")
-					values = append(values, clause.Column{Name: dbName}, m.DB.Migrator().FullDataTypeOf(field))
+					ddlField := field
+					if seqDefault, ok := sequenceDefaults[field]; ok {
+						fieldCopy := *field
+						fieldCopy.DefaultValue = seqDefault
+						ddlField = &fieldCopy
+					}
+					values = append(values, clause.Column{Name: dbName}, m.DB.Migrator().FullDataTypeOf(ddlField))
 					createTableSQL += ","
 				}
 			}

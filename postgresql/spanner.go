@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"math"
 	"runtime"
+	"strings"
 
 	_ "github.com/googleapis/go-sql-spanner"
 	"gorm.io/driver/postgres"
@@ -27,6 +28,11 @@ import (
 	"gorm.io/gorm/clause"
 	"gorm.io/gorm/migrator"
 	"gorm.io/gorm/schema"
+)
+
+const (
+	generatedPrimaryKeyColumn   = "spanner_gorm_generated_id"
+	generatedPrimaryKeyDataType = "serial primary key"
 )
 
 type Dialector struct {
@@ -186,12 +192,18 @@ func (dialector Dialector) ClauseBuilders() map[string]clause.ClauseBuilder {
 				return
 			}
 			if onConflict.DoNothing && len(onConflict.Columns) == 0 {
-				if s := builder.(*gorm.Statement).Schema; s != nil {
+				if stmt, ok := builder.(*gorm.Statement); ok && stmt.Schema != nil {
+					s := stmt.Schema
 					if len(s.PrimaryFields) == 0 {
-						for _, field := range s.Fields {
-							if field.DataType == "serial primary key" {
-								onConflict.Columns = append(onConflict.Columns, clause.Column{Name: field.DBName})
-							}
+						dataTypeOf := migrator.Migrator{Config: migrator.Config{DB: stmt.DB, Dialector: dialector}}.DataTypeOf
+						for _, col := range dataTypePrimaryKeyColumns(s, dataTypeOf) {
+							onConflict.Columns = append(onConflict.Columns, clause.Column{Name: col})
+						}
+						// Spanner PostgreSQL requires an explicit conflict target for ON CONFLICT DO NOTHING.
+						// Since CreateTable emits spanner_gorm_generated_id without mutating s.Fields,
+						// fall back to it here when AutoAddPrimaryKey is enabled and no field declares a PK.
+						if len(onConflict.Columns) == 0 && dialector.SpannerConfig.AutoAddPrimaryKey {
+							onConflict.Columns = append(onConflict.Columns, clause.Column{Name: generatedPrimaryKeyColumn})
 						}
 					} else {
 						for _, field := range s.PrimaryFields {
@@ -215,6 +227,17 @@ func (dialector Dialector) ClauseBuilders() map[string]clause.ClauseBuilder {
 		},
 	}
 	return clauseBuilders
+}
+
+func dataTypePrimaryKeyColumns(s *schema.Schema, dataTypeOf func(*schema.Field) string) []string {
+	var cols []string
+	for _, dbName := range s.DBNames {
+		field := s.FieldsByDBName[dbName]
+		if field != nil && !field.IgnoreMigration && strings.Contains(strings.ToUpper(dataTypeOf(field)), "PRIMARY KEY") {
+			cols = append(cols, dbName)
+		}
+	}
+	return cols
 }
 
 func (dialector Dialector) Migrator(db *gorm.DB) gorm.Migrator {

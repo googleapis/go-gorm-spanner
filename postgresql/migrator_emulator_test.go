@@ -38,6 +38,7 @@ import (
 	"google.golang.org/grpc/status"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"gorm.io/gorm/migrator"
 )
 
@@ -675,6 +676,67 @@ func verifyColumnType(t *testing.T, db *gorm.DB, table, column, want string) {
 	}
 	if g, w := tp, want; g != w {
 		t.Fatalf("data type mismatch for column %v.%v\n Got: %v\nWant: %v", table, column, g, w)
+	}
+}
+
+func TestAutoAddPrimaryKey_Emulator(t *testing.T) {
+	skipIfShortOrNotEmulator(t)
+	t.Parallel()
+
+	type noPKItem struct {
+		Name  string `gorm:"index:idx_no_pk_item_name"`
+		Count int    `gorm:"check:chk_no_pk_item_count,count > 0"`
+	}
+
+	dsn, cleanup, err := testutil.CreateTestDB(context.Background(), databasepb.DatabaseDialect_POSTGRESQL)
+	if err != nil {
+		t.Fatalf("could not init integration tests while creating database: %v", err)
+	}
+	defer cleanup()
+
+	db, err := gorm.Open(NewWithSpannerConfig(postgres.Config{
+		DSN: dsn,
+	}, SpannerConfig{
+		AutoAddPrimaryKey: true,
+	}), &gorm.Config{PrepareStmt: true})
+	if err != nil {
+		t.Fatalf("failed to open gorm connection: %v", err)
+	}
+
+	if err := db.AutoMigrate(&noPKItem{}); err != nil {
+		t.Fatalf("first AutoMigrate failed: %v", err)
+	}
+	// Running AutoMigrate a second time must succeed because spanner_gorm_generated_id
+	// is not added to the cached *schema.Schema.
+	if err := db.AutoMigrate(&noPKItem{}); err != nil {
+		t.Fatalf("second AutoMigrate failed: %v", err)
+	}
+
+	verifyColumnType(t, db, "no_pk_items", generatedPrimaryKeyColumn, "bigint")
+	verifyColumnType(t, db, "no_pk_items", "name", "character varying")
+
+	// Open a fresh *gorm.DB that never ran CreateTable and verify OnConflict{DoNothing: true}
+	// generates valid Spanner PostgreSQL SQL for the generated primary key column.
+	freshDB, err := gorm.Open(NewWithSpannerConfig(postgres.Config{
+		DSN: dsn,
+	}, SpannerConfig{
+		AutoAddPrimaryKey: true,
+	}), &gorm.Config{PrepareStmt: true})
+	if err != nil {
+		t.Fatalf("failed to open fresh gorm connection: %v", err)
+	}
+
+	item := noPKItem{Name: "alpha", Count: 1}
+	if err := freshDB.Clauses(clause.OnConflict{DoNothing: true}).Create(&item).Error; err != nil {
+		t.Fatalf("OnConflict DoNothing Create failed: %v", err)
+	}
+
+	var count int64
+	if err := freshDB.Model(&noPKItem{}).Where("name = ?", "alpha").Count(&count).Error; err != nil {
+		t.Fatalf("failed to count inserted rows: %v", err)
+	}
+	if g, w := count, int64(1); g != w {
+		t.Errorf("row count mismatch\nGot:  %v\nWant: %v", g, w)
 	}
 }
 
