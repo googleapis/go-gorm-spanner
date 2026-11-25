@@ -16,9 +16,10 @@ package spannerpg
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
-	"reflect"
 	"regexp"
+	"slices"
 	"strings"
 
 	"cloud.google.com/go/spanner"
@@ -172,40 +173,120 @@ func (m spannerPostgresMigrator) CreateTable(values ...interface{}) (err error) 
 	}
 
 	for _, value := range m.ReorderModels(values, false) {
-		if err := m.RunWithValue(value, func(stmt *gorm.Statement) (err error) {
-			if stmt.Schema == nil {
-				// Let the base migrator handle this.
-				return nil
-			}
-			var hasPrimaryKeyInDataType bool
-
-			for _, dbName := range stmt.Schema.DBNames {
-				field := stmt.Schema.FieldsByDBName[dbName]
-				if !field.IgnoreMigration {
-					hasPrimaryKeyInDataType = hasPrimaryKeyInDataType || strings.Contains(strings.ToUpper(m.DataTypeOf(field)), "PRIMARY KEY")
-				}
-			}
-
-			// Add a generated primary key.
-			if !hasPrimaryKeyInDataType && len(stmt.Schema.PrimaryFields) == 0 {
-				pk := &schema.Field{
-					Name:              "spanner_gorm_generated_id",
-					DBName:            "spanner_gorm_generated_id",
-					DataType:          "serial primary key",
-					FieldType:         reflect.TypeOf(int64(0)),
-					IndirectFieldType: reflect.TypeOf(int64(0)),
-				}
-				stmt.Schema.DBNames = append(stmt.Schema.DBNames, pk.DBName)
-				stmt.Schema.Fields = append(stmt.Schema.Fields, pk)
-				stmt.Schema.FieldsByDBName[pk.DBName] = pk
-				stmt.Schema.FieldsByName[pk.Name] = pk
+		needsGeneratedPK := false
+		if err := m.RunWithValue(value, func(stmt *gorm.Statement) error {
+			if stmt.Schema != nil && len(stmt.Schema.PrimaryFields) == 0 {
+				needsGeneratedPK = len(dataTypePrimaryKeyColumns(stmt.Schema, m.DataTypeOf)) == 0
 			}
 			return nil
 		}); err != nil {
 			return err
 		}
+
+		if !needsGeneratedPK {
+			if err := m.Migrator.CreateTable(value); err != nil {
+				return err
+			}
+			continue
+		}
+
+		if err := m.createTableWithGeneratedPrimaryKey(value); err != nil {
+			return err
+		}
 	}
-	return m.Migrator.CreateTable(values...)
+	return nil
+}
+
+func (m spannerPostgresMigrator) createTableWithGeneratedPrimaryKey(value interface{}) error {
+	tx := m.DB.Session(&gorm.Session{})
+	return m.RunWithValue(value, func(stmt *gorm.Statement) error {
+		if stmt.Schema == nil {
+			return errors.New("failed to get schema")
+		}
+
+		createTableSQL, sqlValues := m.buildCreateTableWithGeneratedPK(stmt)
+		if err := tx.Exec(createTableSQL, sqlValues...).Error; err != nil {
+			return err
+		}
+
+		for _, idx := range stmt.Schema.ParseIndexes() {
+			if err := tx.Migrator().CreateIndex(value, idx.Name); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func (m spannerPostgresMigrator) buildCreateTableWithGeneratedPK(stmt *gorm.Statement) (string, []interface{}) {
+	var (
+		createTableSQL = "CREATE TABLE ? ("
+		sqlValues      = []interface{}{m.CurrentTable(stmt)}
+	)
+
+	for _, dbName := range stmt.Schema.DBNames {
+		field := stmt.Schema.FieldsByDBName[dbName]
+		if field != nil && !field.IgnoreMigration {
+			createTableSQL += "? ?,"
+			sqlValues = append(sqlValues, clause.Column{Name: dbName}, m.FullDataTypeOf(field))
+		}
+	}
+
+	// Emit the generated primary key column directly in the DDL instead of mutating
+	// the shared cached stmt.Schema.
+	createTableSQL += "? ?,"
+	sqlValues = append(sqlValues, clause.Column{Name: generatedPrimaryKeyColumn}, clause.Expr{SQL: generatedPrimaryKeyDataType})
+
+	createTableSQL, sqlValues = m.appendCreateTableConstraints(stmt, createTableSQL, sqlValues)
+	createTableSQL = strings.TrimSuffix(createTableSQL, ",") + ")"
+
+	if tableOption, ok := m.DB.Get("gorm:table_options"); ok {
+		createTableSQL += fmt.Sprint(tableOption)
+	}
+	return createTableSQL, sqlValues
+}
+
+func (m spannerPostgresMigrator) appendCreateTableConstraints(stmt *gorm.Statement, createTableSQL string, sqlValues []interface{}) (string, []interface{}) {
+	if !m.DB.DisableForeignKeyConstraintWhenMigrating && !m.DB.IgnoreRelationshipsWhenMigrating {
+		for _, key := range sortedKeys(stmt.Schema.Relationships.Relations) {
+			rel := stmt.Schema.Relationships.Relations[key]
+			if rel.Field.IgnoreMigration {
+				continue
+			}
+			if constraint := rel.ParseConstraint(); constraint != nil && constraint.Schema == stmt.Schema {
+				sql, vars := constraint.Build()
+				createTableSQL += sql + ","
+				sqlValues = append(sqlValues, vars...)
+			}
+		}
+	}
+
+	// Emit UNIQUE constraints for parity with gorm's base CreateTable so Spanner
+	// rejects unsupported `gorm:"unique"` tags rather than silently ignoring them.
+	uniqueConstraints := stmt.Schema.ParseUniqueConstraints()
+	for _, key := range sortedKeys(uniqueConstraints) {
+		uni := uniqueConstraints[key]
+		createTableSQL += "CONSTRAINT ? UNIQUE (?),"
+		sqlValues = append(sqlValues, clause.Column{Name: uni.Name}, clause.Expr{SQL: stmt.Quote(uni.Field.DBName)})
+	}
+
+	checkConstraints := stmt.Schema.ParseCheckConstraints()
+	for _, key := range sortedKeys(checkConstraints) {
+		chk := checkConstraints[key]
+		createTableSQL += "CONSTRAINT ? CHECK (?),"
+		sqlValues = append(sqlValues, clause.Column{Name: chk.Name}, clause.Expr{SQL: chk.Constraint})
+	}
+
+	return createTableSQL, sqlValues
+}
+
+func sortedKeys[V any](m map[string]V) []string {
+	keys := make([]string, 0, len(m))
+	for key := range m {
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+	return keys
 }
 
 func (m spannerPostgresMigrator) DropTable(values ...interface{}) error {

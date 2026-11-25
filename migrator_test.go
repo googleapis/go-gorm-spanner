@@ -17,7 +17,11 @@ package gorm
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
+	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
@@ -510,6 +514,92 @@ func TestCreateTable_CreateSequenceError(t *testing.T) {
 	}
 	if g, w := stmt.Schema.LookUpField("ID").DefaultValue, ""; g != w {
 		t.Errorf("DefaultValue mismatch after failed CreateTable\nGot:  %q\nWant: %q", g, w)
+	}
+}
+
+func TestCreateTable_Sequence_DoesNotMutateSchemaConcurrent(t *testing.T) {
+	t.Parallel()
+
+	type concurrentSequenceModel struct {
+		ID uint `gorm:"primarykey" gorm_sequence_name:"concurrent_seq"`
+	}
+
+	db, _, teardown := setupDisabledIdentityMigratorTest(t)
+	defer teardown()
+
+	initStmt := &gorm.Statement{DB: db}
+	if err := initStmt.Parse(&concurrentSequenceModel{}); err != nil {
+		t.Fatalf("initial schema parse failed: %v", err)
+	}
+
+	enteredCreateTable := make(chan struct{})
+	releaseCreateTable := make(chan struct{})
+	var paused atomic.Bool
+	var releaseOnce sync.Once
+	release := func() {
+		releaseOnce.Do(func() { close(releaseCreateTable) })
+	}
+	defer release()
+
+	var mu sync.Mutex
+	var capturedSQL []string
+	if err := db.Callback().Raw().Before("gorm:raw").Register("test:pause_create_table", func(tx *gorm.DB) {
+		sqlText := tx.Statement.SQL.String()
+		mu.Lock()
+		capturedSQL = append(capturedSQL, sqlText)
+		mu.Unlock()
+		if strings.HasPrefix(sqlText, "CREATE TABLE ") && paused.CompareAndSwap(false, true) {
+			close(enteredCreateTable)
+			<-releaseCreateTable
+		}
+	}); err != nil {
+		t.Fatalf("failed to register callback: %v", err)
+	}
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- db.Session(&gorm.Session{DryRun: true, NewDB: true}).Migrator().CreateTable(&concurrentSequenceModel{})
+	}()
+
+	// Deterministically pause the first CreateTable mid-flight at CREATE TABLE.
+	select {
+	case <-enteredCreateTable:
+	case err := <-errCh:
+		t.Fatalf("first CreateTable failed before CREATE TABLE: %v", err)
+	}
+
+	// Verify the cached schema.Field was not mutated in place while CreateTable is in flight.
+	stmt := &gorm.Statement{DB: db}
+	if err := stmt.Parse(&concurrentSequenceModel{}); err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+	idField := stmt.Schema.LookUpField("ID")
+	if idField == nil {
+		t.Fatalf("LookUpField(ID) returned nil")
+	}
+	if g, w := idField.DefaultValue, ""; g != w {
+		t.Errorf("DefaultValue mutated while CreateTable in flight\nGot:  %q\nWant: %q", g, w)
+	}
+
+	// Run a concurrent CreateTable while the first one is still in flight; it must still
+	// emit both CREATE SEQUENCE and CREATE TABLE with the sequence default.
+	if err := db.Session(&gorm.Session{DryRun: true, NewDB: true}).Migrator().CreateTable(&concurrentSequenceModel{}); err != nil {
+		t.Fatalf("concurrent CreateTable failed: %v", err)
+	}
+
+	release()
+	if err := <-errCh; err != nil {
+		t.Fatalf("first CreateTable failed: %v", err)
+	}
+
+	wantSeqSQL := "CREATE SEQUENCE IF NOT EXISTS `concurrent_seq` OPTIONS (sequence_kind = \"bit_reversed_positive\")"
+	wantTableSQL := "CREATE TABLE `concurrent_sequence_models` (`id` INT64 DEFAULT (GET_NEXT_SEQUENCE_VALUE(Sequence `concurrent_seq`))) PRIMARY KEY (`id`)"
+	wantSQL := []string{wantSeqSQL, wantTableSQL, wantSeqSQL, wantTableSQL}
+	mu.Lock()
+	gotSQL := slices.Clone(capturedSQL)
+	mu.Unlock()
+	if !slices.Equal(gotSQL, wantSQL) {
+		t.Errorf("DDL statements mismatch\nGot:  %v\nWant: %v", gotSQL, wantSQL)
 	}
 }
 
