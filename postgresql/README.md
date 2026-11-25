@@ -57,3 +57,8 @@ Supported schema management tools include:
 - golang-migrate: https://github.com/golang-migrate/migrate
 - Liquibase: https://github.com/cloudspannerecosystem/liquibase-spanner
 
+### Manual DDL Batching
+`AutoMigrate` and `AutoMigrateDryRun` manage DDL batching automatically on a dedicated connection. If you call
+`SpannerMigrator.StartBatchDDL` directly to batch manual migrator operations, wrap the calls in `db.Connection(...)`
+(or pass a `*sql.Conn` via `postgres.Config{Conn: conn}`).
+

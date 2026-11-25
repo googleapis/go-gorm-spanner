@@ -15,8 +15,6 @@
 package spannerpg
 
 import (
-	"context"
-	"database/sql"
 	"fmt"
 	"math"
 	"runtime"
@@ -218,23 +216,6 @@ func (dialector Dialector) ClauseBuilders() map[string]clause.ClauseBuilder {
 }
 
 func (dialector Dialector) Migrator(db *gorm.DB) gorm.Migrator {
-	// Assign the migrator a single connection to ensure that batching works.
-	var conn *sql.Conn
-	if c, ok := db.ConnPool.(*sql.Conn); ok && c != nil {
-		conn = c
-	} else {
-		sqlDB, err := db.DB()
-		if err == nil {
-			conn, _ = sqlDB.Conn(context.Background())
-		}
-	}
-	// conn is nil if getting the underlying sql.DB failed.
-	// In that case, we just use the original ConnPool of the database,
-	// which again is likely to fail any operation on the migrator.
-	if conn != nil {
-		db.ConnPool = conn
-		db.Statement.ConnPool = conn
-	}
 	return spannerPostgresMigrator{
 		Migrator: postgres.Migrator{
 			Migrator: migrator.Migrator{

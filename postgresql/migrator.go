@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	"cloud.google.com/go/spanner"
-	spannerdriver "github.com/googleapis/go-sql-spanner"
+	"github.com/googleapis/go-gorm-spanner/internal/batchconn"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -65,15 +65,15 @@ func (m spannerPostgresMigrator) CurrentSchema(stmt *gorm.Statement, table strin
 }
 
 func (m spannerPostgresMigrator) StartBatchDDL() error {
-	return m.DB.Exec("START BATCH DDL").Error
+	return batchconn.StartBatchDDL(m.DB)
 }
 
 func (m spannerPostgresMigrator) RunBatch() error {
-	return m.DB.Exec("RUN BATCH").Error
+	return batchconn.RunBatch(m.DB)
 }
 
 func (m spannerPostgresMigrator) AbortBatch() error {
-	return m.DB.Exec("ABORT BATCH").Error
+	return batchconn.AbortBatch(m.DB)
 }
 
 func (m spannerPostgresMigrator) AutoMigrateDryRun(values ...interface{}) ([]spanner.Statement, error) {
@@ -99,51 +99,29 @@ func (m spannerPostgresMigrator) autoMigrate(dryRun bool, values ...interface{})
 	if err != nil {
 		return nil, err
 	}
-	if dryRun || !disableAutoBatching {
-		if err := m.StartBatchDDL(); err != nil {
-			return nil, err
-		}
-		defer func() {
-			// Abort any active batch when we leave this function.
-			// This is a no-op if there is no batch on the current connection.
-			_ = m.AbortBatch()
-		}()
-	}
-	if c == 0 {
-		tx := m.DB.Session(&gorm.Session{})
-		// The database name is hardcoded in this string as "db", which might seem weird,
-		// but Spanner ignores the database name in ALTER DATABASE statements.
-		if err := tx.Exec(`alter database "db" set spanner.default_sequence_kind = 'bit_reversed_positive'`).Error; err != nil {
-			return nil, err
-		}
-	}
-	err = m.Migrator.AutoMigrate(values...)
-	if err == nil {
-		if !dryRun && disableAutoBatching {
-			return nil, nil
-		} else if dryRun {
-			connPool := m.DB.Statement.ConnPool
-			conn, ok := connPool.(*sql.Conn)
-			if !ok {
-				return nil, fmt.Errorf("unexpected ConnPool type")
+
+	runMigration := func(migrator spannerPostgresMigrator) error {
+		if c == 0 {
+			tx := migrator.DB.Session(&gorm.Session{})
+			// The database name is hardcoded in this string as "db", which might seem weird,
+			// but Spanner ignores the database name in ALTER DATABASE statements.
+			if err := tx.Exec(`alter database "db" set spanner.default_sequence_kind = 'bit_reversed_positive'`).Error; err != nil {
+				return err
 			}
-			var statements []spanner.Statement
-			if err := conn.Raw(func(driverConn any) error {
-				spannerConn, ok := driverConn.(spannerdriver.SpannerConn)
-				if !ok {
-					return fmt.Errorf("dry-run is only supported for Spanner")
-				}
-				statements = spannerConn.GetBatchedStatements()
-				return nil
-			}); err != nil {
-				return nil, err
-			}
-			return statements, m.AbortBatch()
-		} else {
-			return nil, m.RunBatch()
 		}
+		return migrator.Migrator.AutoMigrate(values...)
 	}
-	return nil, err
+
+	if !dryRun && disableAutoBatching {
+		return nil, runMigration(m)
+	}
+	return batchconn.RunDDLBatch(m.DB, dryRun, func(tx *gorm.DB) error {
+		batchMigrator, ok := tx.Migrator().(spannerPostgresMigrator)
+		if !ok {
+			return fmt.Errorf("unexpected migrator type: %T", tx.Migrator())
+		}
+		return runMigration(batchMigrator)
+	})
 }
 
 func (m spannerPostgresMigrator) GetTables() (tableList []string, err error) {

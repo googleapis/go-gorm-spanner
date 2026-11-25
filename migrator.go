@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	"cloud.google.com/go/spanner"
-	spannerdriver "github.com/googleapis/go-sql-spanner"
+	"github.com/googleapis/go-gorm-spanner/internal/batchconn"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"gorm.io/gorm/migrator"
@@ -41,14 +41,40 @@ const (
 // for Spanner for both GoogleSQL and PostgreSQL. Use this interface to
 // get access to custom Spanner features, such as DDL batching.
 //
-// See samples/snippets/migrator.go for an example using GoogleSQL.
+// AutoMigrate and AutoMigrateDryRun automatically run DDL batches on a
+// dedicated connection. Manual DDL batching via StartBatchDDL, RunBatch, and
+// AbortBatch requires a dedicated connection, for example via db.Connection:
+//
+//	err := db.Connection(func(tx *gorm.DB) error {
+//		m := tx.Migrator().(SpannerMigrator)
+//		if err := m.StartBatchDDL(); err != nil {
+//			return err
+//		}
+//		defer func() { _ = m.AbortBatch() }()
+//		if err := m.CreateTable(&Model{}); err != nil {
+//			return err
+//		}
+//		return m.RunBatch()
+//	})
+//
+// See samples/snippets/migrations.go for an example using GoogleSQL.
 // See samples/postgresql/snippets/migrations.go for an example using PostgreSQL.
 type SpannerMigrator interface {
 	gorm.Migrator
 
+	// AutoMigrateDryRun returns the DDL statements that AutoMigrate would execute
+	// without applying them to the database.
 	AutoMigrateDryRun(values ...interface{}) ([]spanner.Statement, error)
+
+	// StartBatchDDL starts a manual DDL batch on the migrator's connection.
+	// Requires a dedicated connection (for example via db.Connection or
+	// Config{Conn: conn}); calling this on a pooled *sql.DB returns an error.
 	StartBatchDDL() error
+
+	// RunBatch executes all DDL statements buffered since StartBatchDDL.
 	RunBatch() error
+
+	// AbortBatch discards any DDL statements buffered since StartBatchDDL.
 	AbortBatch() error
 }
 
@@ -85,50 +111,29 @@ func (m spannerMigrator) AutoMigrate(values ...interface{}) error {
 }
 
 func (m spannerMigrator) autoMigrate(dryRun bool, values ...interface{}) ([]spanner.Statement, error) {
-	if dryRun || !m.Dialector.Config.DisableAutoMigrateBatching {
-		if err := m.StartBatchDDL(); err != nil {
-			return nil, err
-		}
+	disableAutoBatching := m.Dialector.Config != nil && m.Dialector.Config.DisableAutoMigrateBatching
+	if !dryRun && disableAutoBatching {
+		return nil, m.Migrator.AutoMigrate(values...)
 	}
-	err := m.Migrator.AutoMigrate(values...)
-	if err == nil {
-		if !dryRun && m.Dialector.Config.DisableAutoMigrateBatching {
-			return nil, nil
-		} else if dryRun {
-			connPool := m.DB.Statement.ConnPool
-			conn, ok := connPool.(*sql.Conn)
-			if !ok {
-				return nil, fmt.Errorf("unexpected ConnPool type")
-			}
-			var statements []spanner.Statement
-			if err := conn.Raw(func(driverConn any) error {
-				spannerConn, ok := driverConn.(spannerdriver.SpannerConn)
-				if !ok {
-					return fmt.Errorf("dry-run is only supported for Spanner")
-				}
-				statements = spannerConn.GetBatchedStatements()
-				return nil
-			}); err != nil {
-				return nil, err
-			}
-			return statements, m.AbortBatch()
-		} else {
-			return nil, m.RunBatch()
+	return batchconn.RunDDLBatch(m.DB, dryRun, func(tx *gorm.DB) error {
+		batchMigrator, ok := tx.Migrator().(spannerMigrator)
+		if !ok {
+			return fmt.Errorf("unexpected migrator type: %T", tx.Migrator())
 		}
-	}
-	return nil, err
+		return batchMigrator.Migrator.AutoMigrate(values...)
+	})
 }
 
 func (m spannerMigrator) StartBatchDDL() error {
-	return m.DB.Exec("START BATCH DDL").Error
+	return batchconn.StartBatchDDL(m.DB)
 }
 
 func (m spannerMigrator) RunBatch() error {
-	return m.DB.Exec("RUN BATCH").Error
+	return batchconn.RunBatch(m.DB)
 }
 
 func (m spannerMigrator) AbortBatch() error {
-	return m.DB.Exec("ABORT BATCH").Error
+	return batchconn.AbortBatch(m.DB)
 }
 
 // FullDataTypeOf returns field's db full data type
