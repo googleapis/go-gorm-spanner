@@ -682,3 +682,161 @@ func TestAutoMigrate_SequenceQuoting(t *testing.T) {
 		})
 	}
 }
+
+type columnTypesEmulatorKeywordModel struct {
+	ID   int64  `gorm:"primarykey"`
+	Name string `gorm:"size:100"`
+}
+
+func (columnTypesEmulatorKeywordModel) TableName() string {
+	return "select"
+}
+
+type columnTypesEmulatorInjectionModel struct {
+	ID int64 `gorm:"primarykey"`
+}
+
+func (columnTypesEmulatorInjectionModel) TableName() string {
+	return "singers WHERE 1=1; --"
+}
+
+func TestSpannerMigrator_ColumnTypes_Emulator_ValidAndIsolated(t *testing.T) {
+	skipIfShortOrNotEmulator(t)
+	t.Parallel()
+
+	dsn, cleanup, err := testutil.CreateTestDB(context.Background(), databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL)
+	if err != nil {
+		t.Fatalf("could not create test database: %v", err)
+	}
+	defer cleanup()
+
+	db, err := gorm.Open(New(Config{
+		DriverName: "spanner",
+		DSN:        dsn,
+	}), &gorm.Config{PrepareStmt: true})
+	if err != nil {
+		t.Fatalf("failed to open gorm db: %v", err)
+	}
+	defer func() {
+		if sqlDB, err := db.DB(); err == nil && sqlDB != nil {
+			_ = sqlDB.Close()
+		}
+	}()
+
+	if err := db.Migrator().AutoMigrate(&columnTypesEmulatorKeywordModel{}, &Singer{}); err != nil {
+		t.Fatalf("AutoMigrate failed: %v", err)
+	}
+	if err := db.Create(&columnTypesEmulatorKeywordModel{ID: 1, Name: "alice"}).Error; err != nil {
+		t.Fatalf("Create keyword row failed: %v", err)
+	}
+	if err := db.Create(&Singer{FirstName: sql.NullString{String: "Alice", Valid: true}, LastName: "Smith", Active: true}).Error; err != nil {
+		t.Fatalf("Create Singer row failed: %v", err)
+	}
+
+	tests := []struct {
+		name     string
+		buildDB  func(*gorm.DB) *gorm.DB
+		value    interface{}
+		wantCols int
+	}{
+		{
+			name:     "reserved keyword table by string",
+			buildDB:  func(d *gorm.DB) *gorm.DB { return d },
+			value:    "select",
+			wantCols: 2,
+		},
+		{
+			name:     "reserved keyword table by model",
+			buildDB:  func(d *gorm.DB) *gorm.DB { return d },
+			value:    &columnTypesEmulatorKeywordModel{},
+			wantCols: 2,
+		},
+		{
+			name:     "standard table by string",
+			buildDB:  func(d *gorm.DB) *gorm.DB { return d },
+			value:    "singers",
+			wantCols: 8,
+		},
+		{
+			name: "prior Table with vars, Where, and Select ignored",
+			buildDB: func(d *gorm.DB) *gorm.DB {
+				return d.Table("singers WHERE ? = 1", 1).Where("active = ?", true).Select("id")
+			},
+			value:    &Singer{},
+			wantCols: 8,
+		},
+		{
+			name: "prior Raw with vars ignored",
+			buildDB: func(d *gorm.DB) *gorm.DB {
+				return d.Raw("SELECT ?", 99)
+			},
+			value:    &Singer{},
+			wantCols: 8,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			cols, err := tc.buildDB(db).Migrator().ColumnTypes(tc.value)
+			if err != nil {
+				t.Fatalf("ColumnTypes(%v) failed: %v", tc.value, err)
+			}
+			if g, w := len(cols), tc.wantCols; g != w {
+				t.Fatalf("column count mismatch\nGot:  %v\nWant: %v", g, w)
+			}
+			if cols[0].ScanType() == nil {
+				t.Errorf("expected SQLColumnType ScanType to be populated for column %q, got nil", cols[0].Name())
+			}
+		})
+	}
+}
+
+func TestSpannerMigrator_ColumnTypes_Emulator_RejectsInjectionPayloads(t *testing.T) {
+	skipIfShortOrNotEmulator(t)
+	t.Parallel()
+
+	dsn, cleanup, err := testutil.CreateTestDB(context.Background(), databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL)
+	if err != nil {
+		t.Fatalf("could not create test database: %v", err)
+	}
+	defer cleanup()
+
+	db, err := gorm.Open(New(Config{
+		DriverName: "spanner",
+		DSN:        dsn,
+	}), &gorm.Config{PrepareStmt: true})
+	if err != nil {
+		t.Fatalf("failed to open gorm db: %v", err)
+	}
+	defer func() {
+		if sqlDB, err := db.DB(); err == nil && sqlDB != nil {
+			_ = sqlDB.Close()
+		}
+	}()
+
+	if err := db.Migrator().AutoMigrate(&Singer{}); err != nil {
+		t.Fatalf("AutoMigrate failed: %v", err)
+	}
+	if err := db.Create(&Singer{FirstName: sql.NullString{String: "Alice", Valid: true}, LastName: "Smith", Active: true}).Error; err != nil {
+		t.Fatalf("Create Singer row failed: %v", err)
+	}
+
+	tests := []struct {
+		name  string
+		value interface{}
+	}{
+		{name: "space and WHERE clause", value: "singers WHERE 1=1"},
+		{name: "UNION ALL SELECT", value: "singers UNION ALL SELECT * FROM singers"},
+		{name: "table with space", value: "my singers"},
+		{name: "current table sentinel", value: "~~~ct~~~"},
+		{name: "model with spaced injection TableName", value: &columnTypesEmulatorInjectionModel{}},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := db.Migrator().ColumnTypes(tc.value); err == nil {
+				t.Fatalf("expected error for injection payload %v, got nil", tc.value)
+			}
+		})
+	}
+}

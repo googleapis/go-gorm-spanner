@@ -677,3 +677,401 @@ func verifyColumnType(t *testing.T, db *gorm.DB, table, column, want string) {
 		t.Fatalf("data type mismatch for column %v.%v\n Got: %v\nWant: %v", table, column, g, w)
 	}
 }
+
+type pgColumnTypesEmulatorKeywordModel struct {
+	ID   int64  `gorm:"primarykey"`
+	Name string `gorm:"size:100"`
+}
+
+func (pgColumnTypesEmulatorKeywordModel) TableName() string {
+	return "select"
+}
+
+type pgColumnTypesEmulatorInjectionModel struct {
+	ID int64 `gorm:"primarykey"`
+}
+
+func (pgColumnTypesEmulatorInjectionModel) TableName() string {
+	return "singers WHERE 1=1; --"
+}
+
+func TestSpannerPostgresMigrator_ColumnTypes_Emulator_ValidAndIsolated(t *testing.T) {
+	skipIfShortOrNotEmulator(t)
+	t.Parallel()
+
+	dsn, cleanup, err := testutil.CreateTestDB(context.Background(), databasepb.DatabaseDialect_POSTGRESQL)
+	if err != nil {
+		t.Fatalf("could not create test database: %v", err)
+	}
+	defer cleanup()
+
+	db, err := gorm.Open(New(postgres.Config{
+		DSN: dsn,
+	}), &gorm.Config{PrepareStmt: true})
+	if err != nil {
+		t.Fatalf("failed to open gorm db: %v", err)
+	}
+	defer func() {
+		if sqlDB, err := db.DB(); err == nil && sqlDB != nil {
+			_ = sqlDB.Close()
+		}
+	}()
+
+	if err := db.Migrator().AutoMigrate(&pgColumnTypesEmulatorKeywordModel{}, &Singer{}); err != nil {
+		t.Fatalf("AutoMigrate failed: %v", err)
+	}
+	if err := db.Create(&pgColumnTypesEmulatorKeywordModel{ID: 1, Name: "alice"}).Error; err != nil {
+		t.Fatalf("Create keyword row failed: %v", err)
+	}
+	if err := db.Create(&Singer{FirstName: sql.NullString{String: "Alice", Valid: true}, LastName: "Smith", Active: true}).Error; err != nil {
+		t.Fatalf("Create Singer row failed: %v", err)
+	}
+
+	tests := []struct {
+		name     string
+		buildDB  func(*gorm.DB) *gorm.DB
+		value    interface{}
+		wantCols int
+	}{
+		{
+			name:     "reserved keyword table by string",
+			buildDB:  func(d *gorm.DB) *gorm.DB { return d },
+			value:    "select",
+			wantCols: 2,
+		},
+		{
+			name:     "reserved keyword table by model",
+			buildDB:  func(d *gorm.DB) *gorm.DB { return d },
+			value:    &pgColumnTypesEmulatorKeywordModel{},
+			wantCols: 2,
+		},
+		{
+			name:     "standard table by string",
+			buildDB:  func(d *gorm.DB) *gorm.DB { return d },
+			value:    "singers",
+			wantCols: 8,
+		},
+		{
+			name: "prior Table with vars, Where, and Select ignored",
+			buildDB: func(d *gorm.DB) *gorm.DB {
+				return d.Table("singers WHERE ? = 1", 1).Where("active = ?", true).Select("id")
+			},
+			value:    &Singer{},
+			wantCols: 8,
+		},
+		{
+			name: "prior Raw with vars ignored",
+			buildDB: func(d *gorm.DB) *gorm.DB {
+				return d.Raw("SELECT ?", 99)
+			},
+			value:    &Singer{},
+			wantCols: 8,
+		},
+		{
+			name: "DryRun session executes metadata and GetRows cleanly",
+			buildDB: func(d *gorm.DB) *gorm.DB {
+				return d.Session(&gorm.Session{DryRun: true})
+			},
+			value:    &Singer{},
+			wantCols: 8,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			cols, err := tc.buildDB(db).Migrator().ColumnTypes(tc.value)
+			if err != nil {
+				t.Fatalf("ColumnTypes(%v) failed: %v", tc.value, err)
+			}
+			if g, w := len(cols), tc.wantCols; g != w {
+				t.Fatalf("column count mismatch\nGot:  %v\nWant: %v", g, w)
+			}
+			if cols[0].ScanType() == nil {
+				t.Errorf("expected SQLColumnType ScanType to be populated for column %q, got nil", cols[0].Name())
+			}
+		})
+	}
+}
+
+func TestSpannerPostgresMigrator_ColumnTypes_Emulator_RejectsInjectionPayloads(t *testing.T) {
+	skipIfShortOrNotEmulator(t)
+	t.Parallel()
+
+	dsn, cleanup, err := testutil.CreateTestDB(context.Background(), databasepb.DatabaseDialect_POSTGRESQL)
+	if err != nil {
+		t.Fatalf("could not create test database: %v", err)
+	}
+	defer cleanup()
+
+	db, err := gorm.Open(New(postgres.Config{
+		DSN: dsn,
+	}), &gorm.Config{PrepareStmt: true})
+	if err != nil {
+		t.Fatalf("failed to open gorm db: %v", err)
+	}
+	defer func() {
+		if sqlDB, err := db.DB(); err == nil && sqlDB != nil {
+			_ = sqlDB.Close()
+		}
+	}()
+
+	if err := db.Migrator().AutoMigrate(&Singer{}); err != nil {
+		t.Fatalf("AutoMigrate failed: %v", err)
+	}
+	if err := db.Create(&Singer{FirstName: sql.NullString{String: "Alice", Valid: true}, LastName: "Smith", Active: true}).Error; err != nil {
+		t.Fatalf("Create Singer row failed: %v", err)
+	}
+
+	tests := []struct {
+		name  string
+		value interface{}
+	}{
+		{name: "space and WHERE clause", value: "singers WHERE 1=1"},
+		{name: "UNION ALL SELECT", value: "singers UNION ALL SELECT * FROM singers"},
+		{name: "double quote injection payload", value: `singers" WHERE 1=1`},
+		{name: "leading double-quote injection payload", value: `"" WHERE 1=1`},
+		{name: "backtick injection payload", value: "singers` WHERE 1=1"},
+		{name: "current table sentinel", value: "~~~ct~~~"},
+		{name: "trailing dot", value: "public."},
+		{name: "model with spaced injection TableName", value: &pgColumnTypesEmulatorInjectionModel{}},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := db.Migrator().ColumnTypes(tc.value); err == nil {
+				t.Fatalf("expected error for injection payload %v, got nil", tc.value)
+			}
+		})
+	}
+}
+
+type multiSchemaPublicParent struct {
+	ID   uint   `gorm:"primarykey"`
+	Name string `gorm:"index:idx_shared_name"`
+}
+
+func (multiSchemaPublicParent) TableName() string {
+	return "parents"
+}
+
+type multiSchemaS1Parent struct {
+	ID   uint   `gorm:"primarykey"`
+	Name string `gorm:"index:idx_shared_name"`
+}
+
+func (multiSchemaS1Parent) TableName() string {
+	return "s1.parents"
+}
+
+type multiSchemaS2Child struct {
+	ID       uint `gorm:"primarykey"`
+	ParentID uint
+	Age      int                  `gorm:"check:chk_age,age > 0"`
+	Parent   *multiSchemaS1Parent `gorm:"foreignKey:ParentID"`
+}
+
+func (multiSchemaS2Child) TableName() string {
+	return "s2.children"
+}
+
+type multiSchemaS2CrossChild struct {
+	ID       uint `gorm:"primarykey"`
+	ParentID uint
+	Parent   *multiSchemaPublicParent `gorm:"foreignKey:ParentID"`
+}
+
+func (multiSchemaS2CrossChild) TableName() string {
+	return "s2.cross_children"
+}
+
+type multiSchemaPublicItem struct {
+	ID   uint   `gorm:"primarykey"`
+	Name string `gorm:"index:idx_public_item"`
+}
+
+func (multiSchemaPublicItem) TableName() string {
+	return "public.items"
+}
+
+type multiSchemaS1Item struct {
+	ID   uint   `gorm:"primarykey"`
+	Name string `gorm:"index:idx_s1_item"`
+}
+
+func (multiSchemaS1Item) TableName() string {
+	return "s1.items"
+}
+
+func TestDropTable_MultipleSchemas(t *testing.T) {
+	skipIfShortOrNotEmulator(t)
+	t.Parallel()
+
+	dsn, cleanup, err := testutil.CreateTestDB(
+		context.Background(),
+		databasepb.DatabaseDialect_POSTGRESQL,
+		`CREATE SCHEMA "s1"`,
+		`CREATE SCHEMA "s2"`,
+	)
+	if err != nil {
+		t.Fatalf("could not create test database: %v", err)
+	}
+	defer cleanup()
+
+	db, err := gorm.Open(New(postgres.Config{
+		DSN: dsn,
+	}), &gorm.Config{PrepareStmt: true})
+	if err != nil {
+		t.Fatalf("failed to open gorm DB: %v", err)
+	}
+
+	if err := db.AutoMigrate(&multiSchemaPublicParent{}, &multiSchemaS1Parent{}, &multiSchemaS2Child{}, &multiSchemaS2CrossChild{}); err != nil {
+		t.Fatalf("AutoMigrate failed: %v", err)
+	}
+	if g, w := db.Migrator().HasConstraint(&multiSchemaS2Child{}, "Parent"), true; g != w {
+		t.Fatalf("pre-drop HasConstraint(s2.children, Parent) mismatch\nGot:  %v\nWant: %v", g, w)
+	}
+	if g, w := db.Migrator().HasConstraint(&multiSchemaS2CrossChild{}, "Parent"), true; g != w {
+		t.Fatalf("pre-drop HasConstraint(s2.cross_children, Parent) mismatch\nGot:  %v\nWant: %v", g, w)
+	}
+
+	if err := db.Migrator().DropTable(&multiSchemaS1Parent{}); err != nil {
+		t.Fatalf("DropTable(&multiSchemaS1Parent{}) failed: %v", err)
+	}
+
+	if g, w := db.Migrator().HasTable(&multiSchemaS1Parent{}), false; g != w {
+		t.Errorf("HasTable(s1.parents) mismatch\nGot:  %v\nWant: %v", g, w)
+	}
+	if g, w := db.Migrator().HasConstraint(&multiSchemaS2Child{}, "Parent"), false; g != w {
+		t.Errorf("HasConstraint(s2.children, Parent) mismatch\nGot:  %v\nWant: %v", g, w)
+	}
+	if g, w := db.Migrator().HasTable(&multiSchemaPublicParent{}), true; g != w {
+		t.Errorf("HasTable(public.parents) mismatch\nGot:  %v\nWant: %v", g, w)
+	}
+	if g, w := db.Migrator().HasIndex(&multiSchemaPublicParent{}, "idx_shared_name"), true; g != w {
+		t.Errorf("HasIndex(public.parents, idx_shared_name) mismatch\nGot:  %v\nWant: %v", g, w)
+	}
+
+	if err := db.Migrator().DropTable("public.parents"); err != nil {
+		t.Fatalf("DropTable(public.parents) failed: %v", err)
+	}
+	if g, w := db.Migrator().HasTable("public.parents"), false; g != w {
+		t.Errorf("HasTable(public.parents) after drop mismatch\nGot:  %v\nWant: %v", g, w)
+	}
+	if g, w := db.Migrator().HasConstraint(&multiSchemaS2CrossChild{}, "Parent"), false; g != w {
+		t.Errorf("HasConstraint(s2.cross_children, Parent) mismatch\nGot:  %v\nWant: %v", g, w)
+	}
+}
+
+type multiSchemaPublicSameNameChild struct {
+	ID       uint `gorm:"primarykey"`
+	ParentID uint
+}
+
+func (multiSchemaPublicSameNameChild) TableName() string {
+	return "parents"
+}
+
+type multiSchemaS1ParentWithHasMany struct {
+	ID                     uint                             `gorm:"primarykey"`
+	PublicSameNameChildren []multiSchemaPublicSameNameChild `gorm:"foreignKey:ParentID"`
+}
+
+func (multiSchemaS1ParentWithHasMany) TableName() string {
+	return "s1.parents"
+}
+
+func TestDropConstraint_MultipleSchemas(t *testing.T) {
+	skipIfShortOrNotEmulator(t)
+	t.Parallel()
+
+	dsn, cleanup, err := testutil.CreateTestDB(
+		context.Background(),
+		databasepb.DatabaseDialect_POSTGRESQL,
+		`CREATE SCHEMA "s1"`,
+		`CREATE SCHEMA "s2"`,
+	)
+	if err != nil {
+		t.Fatalf("could not create test database: %v", err)
+	}
+	defer cleanup()
+
+	db, err := gorm.Open(New(postgres.Config{
+		DSN: dsn,
+	}), &gorm.Config{PrepareStmt: true})
+	if err != nil {
+		t.Fatalf("failed to open gorm DB: %v", err)
+	}
+
+	if err := db.AutoMigrate(&multiSchemaS1Parent{}, &multiSchemaS2Child{}, &multiSchemaS1ParentWithHasMany{}, &multiSchemaPublicSameNameChild{}); err != nil {
+		t.Fatalf("AutoMigrate failed: %v", err)
+	}
+	if g, w := db.Migrator().HasConstraint(&multiSchemaS2Child{}, "chk_age"), true; g != w {
+		t.Fatalf("pre-drop HasConstraint(s2.children, chk_age) mismatch\nGot:  %v\nWant: %v", g, w)
+	}
+	if g, w := db.Migrator().HasConstraint(&multiSchemaS2Child{}, "Parent"), true; g != w {
+		t.Fatalf("pre-drop HasConstraint(s2.children, Parent) mismatch\nGot:  %v\nWant: %v", g, w)
+	}
+	if g, w := db.Migrator().HasConstraint(&multiSchemaS1ParentWithHasMany{}, "PublicSameNameChildren"), true; g != w {
+		t.Fatalf("pre-drop HasConstraint(s1.parents, PublicSameNameChildren) mismatch\nGot:  %v\nWant: %v", g, w)
+	}
+
+	if err := db.Migrator().DropConstraint(&multiSchemaS2Child{}, "chk_age"); err != nil {
+		t.Fatalf("DropConstraint(chk_age) failed: %v", err)
+	}
+	if g, w := db.Migrator().HasConstraint(&multiSchemaS2Child{}, "chk_age"), false; g != w {
+		t.Errorf("HasConstraint(s2.children, chk_age) mismatch\nGot:  %v\nWant: %v", g, w)
+	}
+
+	if err := db.Migrator().DropConstraint(&multiSchemaS2Child{}, "Parent"); err != nil {
+		t.Fatalf("DropConstraint(Parent) failed: %v", err)
+	}
+	if g, w := db.Migrator().HasConstraint(&multiSchemaS2Child{}, "Parent"), false; g != w {
+		t.Errorf("HasConstraint(s2.children, Parent) mismatch\nGot:  %v\nWant: %v", g, w)
+	}
+
+	if err := db.Migrator().DropConstraint(&multiSchemaS1ParentWithHasMany{}, "PublicSameNameChildren"); err != nil {
+		t.Fatalf("DropConstraint(PublicSameNameChildren) failed: %v", err)
+	}
+	if g, w := db.Migrator().HasConstraint(&multiSchemaS1ParentWithHasMany{}, "PublicSameNameChildren"), false; g != w {
+		t.Errorf("HasConstraint(s1.parents, PublicSameNameChildren) mismatch\nGot:  %v\nWant: %v", g, w)
+	}
+}
+
+func TestGetIndexes_MultipleSchemas(t *testing.T) {
+	skipIfShortOrNotEmulator(t)
+	t.Parallel()
+
+	dsn, cleanup, err := testutil.CreateTestDB(
+		context.Background(),
+		databasepb.DatabaseDialect_POSTGRESQL,
+		`CREATE SCHEMA "s1"`,
+	)
+	if err != nil {
+		t.Fatalf("could not create test database: %v", err)
+	}
+	defer cleanup()
+
+	db, err := gorm.Open(New(postgres.Config{
+		DSN: dsn,
+	}), &gorm.Config{PrepareStmt: true})
+	if err != nil {
+		t.Fatalf("failed to open gorm DB: %v", err)
+	}
+
+	if err := db.AutoMigrate(&multiSchemaPublicItem{}, &multiSchemaS1Item{}); err != nil {
+		t.Fatalf("AutoMigrate failed: %v", err)
+	}
+
+	indexes, err := db.Migrator().GetIndexes(&multiSchemaS1Item{})
+	if err != nil {
+		t.Fatalf("GetIndexes failed: %v", err)
+	}
+	names := make([]string, 0, len(indexes))
+	for _, idx := range indexes {
+		names = append(names, idx.Name())
+	}
+	slices.Sort(names)
+	if g, w := names, []string{"PRIMARY_KEY", "idx_s1_item"}; !cmp.Equal(g, w) {
+		t.Errorf("GetIndexes(s1.items) mismatch\nGot:  %v\nWant: %v", g, w)
+	}
+}

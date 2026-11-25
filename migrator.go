@@ -410,6 +410,9 @@ func (m spannerMigrator) AlterColumn(value interface{}, field string) error {
 func (m spannerMigrator) ColumnTypes(value interface{}) ([]gorm.ColumnType, error) {
 	columnTypes := make([]gorm.ColumnType, 0)
 	err := m.RunWithValue(value, func(stmt *gorm.Statement) error {
+		if stmt.Table == "" {
+			return errors.New("table name cannot be empty")
+		}
 		columnTypeSQL := `
 				SELECT COLUMN_NAME, COLUMN_DEFAULT, IS_NULLABLE = 'YES',
 					   REGEXP_REPLACE(SPANNER_TYPE, '\\(.*\\)', '') AS DATA_TYPE,
@@ -426,21 +429,33 @@ func (m spannerMigrator) ColumnTypes(value interface{}) ([]gorm.ColumnType, erro
 						LIMIT 1
 					   ) AS KEY,
                     `
-		rows, err := m.DB.Session(&gorm.Session{}).Table(stmt.Table).Limit(1).Rows()
+		// Quote stmt.Table directly as a string rather than passing it to DB.Table()
+		// (which treats spaces/backticks as raw SQL) or clause.Table{Name: stmt.Table}
+		// (which substitutes clause.CurrentTable "~~~ct~~~").
+		rows, err := m.DB.Session(&gorm.Session{NewDB: true}).
+			Clauses(clause.From{Tables: []clause.Table{{Name: stmt.Quote(stmt.Table), Raw: true}}}).
+			Limit(1).
+			Rows()
 		if err != nil {
 			return err
 		}
 		rawColumnTypes, err := rows.ColumnTypes()
-		if err != nil {
-			return err
+		if err == nil {
+			// database/sql's ColumnTypes calls driver.Rows.Columns(), which has no error
+			// return; advance once so any deferred query/stream error surfaces in rows.Err().
+			_ = rows.Next()
+			err = rows.Err()
 		}
-		if err := rows.Close(); err != nil {
+		if closeErr := rows.Close(); err == nil {
+			err = closeErr
+		}
+		if err != nil {
 			return err
 		}
 
 		columnTypeSQL += "FROM INFORMATION_SCHEMA.COLUMNS C WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION"
 		currentDatabase := m.CurrentDatabase()
-		columns, rowErr := m.DB.Table(stmt.Table).Raw(columnTypeSQL, &currentDatabase, &stmt.Table).Rows()
+		columns, rowErr := m.DB.Session(&gorm.Session{NewDB: true}).Raw(columnTypeSQL, &currentDatabase, &stmt.Table).Rows()
 		if rowErr != nil {
 			return rowErr
 		}
