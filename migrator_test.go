@@ -17,6 +17,7 @@ package gorm
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strconv"
 	"testing"
 
@@ -573,6 +574,403 @@ func TestMigrateMultipleTimes(t *testing.T) {
 	requests = server.TestDatabaseAdmin.Reqs()
 	if g, w := len(requests), 1; g != w {
 		t.Fatalf("request count mismatch\n Got: %v\nWant: %v", g, w)
+	}
+}
+
+const spannerColDetailsSQL = "\n\t\t\t\tSELECT COLUMN_NAME, COLUMN_DEFAULT, IS_NULLABLE = 'YES',\n\t\t\t\t\t   REGEXP_REPLACE(SPANNER_TYPE, '\\\\(.*\\\\)', '') AS DATA_TYPE,\n\t\t\t\t\t   SAFE_CAST(REPLACE(REPLACE(REGEXP_EXTRACT(SPANNER_TYPE, '\\\\(.*\\\\)'), '(', ''), ')', '') AS INT64) AS COLUMN_LENGTH,\n\t\t\t\t\t   (SELECT IF(I.INDEX_TYPE='PRIMARY_KEY', 'PRI', 'UNI')\n\t\t\t\t\t\tFROM INFORMATION_SCHEMA.INDEXES I\n\t\t\t\t\t\tINNER JOIN INFORMATION_SCHEMA.INDEX_COLUMNS IC USING (TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME, INDEX_NAME)\n\t\t\t\t\t\tWHERE IC.TABLE_CATALOG = C.TABLE_CATALOG\n\t\t\t\t\t\t  AND IC.TABLE_SCHEMA =  C.TABLE_SCHEMA\n\t\t\t\t\t\t  AND IC.TABLE_NAME =    C.TABLE_NAME\n\t\t\t\t\t\t  AND IC.COLUMN_NAME =   C.COLUMN_NAME\n\t\t\t\t\t\t  AND I.IS_UNIQUE\n\t\t\t\t\t\tORDER BY I.INDEX_TYPE\n\t\t\t\t\t\tLIMIT 1\n\t\t\t\t\t   ) AS KEY,\n                    FROM INFORMATION_SCHEMA.COLUMNS C WHERE TABLE_SCHEMA = @p1 AND TABLE_NAME = @p2 ORDER BY ORDINAL_POSITION"
+
+type columnTypesSpacedModel struct {
+	ID uint `gorm:"primarykey"`
+}
+
+func (columnTypesSpacedModel) TableName() string {
+	return "singers WHERE 1=1; --"
+}
+
+type columnTypesBacktickModel struct {
+	ID uint `gorm:"primarykey"`
+}
+
+func (columnTypesBacktickModel) TableName() string {
+	return "singers` WHERE 1=1; --"
+}
+
+func TestSpannerMigrator_ColumnTypes_TableQuoting(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name              string
+		value             interface{}
+		wantTableParam    string
+		wantExactSQL      string
+		tableNameForQuote string
+		skipSpanSQL       bool
+	}{
+		{
+			name:           "simple table name",
+			value:          "singers",
+			wantTableParam: "singers",
+			wantExactSQL:   "SELECT * FROM `singers` LIMIT @p1",
+		},
+		{
+			name:           "table name with space",
+			value:          "my singers",
+			wantTableParam: "my singers",
+			wantExactSQL:   "SELECT * FROM `my singers` LIMIT @p1",
+		},
+		{
+			name:           "SQL injection payload with space and WHERE",
+			value:          "singers WHERE 1=1",
+			wantTableParam: "singers WHERE 1=1",
+			wantExactSQL:   "SELECT * FROM `singers WHERE 1=1` LIMIT @p1",
+		},
+		{
+			name:           "SQL injection payload with UNION and comment",
+			value:          "singers UNION ALL SELECT 1 --",
+			wantTableParam: "singers UNION ALL SELECT 1 --",
+			wantExactSQL:   "SELECT * FROM `singers UNION ALL SELECT 1 --` LIMIT @p1",
+		},
+		{
+			name:           "reserved keyword",
+			value:          "SELECT",
+			wantTableParam: "SELECT",
+			wantExactSQL:   "SELECT * FROM `SELECT` LIMIT @p1",
+		},
+		{
+			name:           "current table sentinel",
+			value:          "~~~ct~~~",
+			wantTableParam: "~~~ct~~~",
+			wantExactSQL:   "SELECT * FROM `~~~ct~~~` LIMIT @p1",
+		},
+		{
+			name:           "schema-qualified string",
+			value:          "myschema.singers",
+			wantTableParam: "myschema.singers",
+			wantExactSQL:   "SELECT * FROM `myschema`.`singers` LIMIT @p1",
+			skipSpanSQL:    true,
+		},
+		{
+			name:           "model with spaced injection TableName",
+			value:          &columnTypesSpacedModel{},
+			wantTableParam: "singers WHERE 1=1; --",
+			wantExactSQL:   "SELECT * FROM `singers WHERE 1=1; --` LIMIT @p1",
+		},
+		{
+			name:              "backtick in string table name uses Dialector.QuoteTo",
+			value:             "singers` WHERE 1=1; --",
+			wantTableParam:    "singers` WHERE 1=1; --",
+			tableNameForQuote: "singers` WHERE 1=1; --",
+			skipSpanSQL:       true,
+		},
+		{
+			name:              "model with backtick injection TableName uses Dialector.QuoteTo",
+			value:             &columnTypesBacktickModel{},
+			wantTableParam:    "singers` WHERE 1=1; --",
+			tableNameForQuote: "singers` WHERE 1=1; --",
+			skipSpanSQL:       true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			db, server, teardown := setupTestGormConnection(t)
+			defer teardown()
+			drainRequestsFromServer(server.TestSpanner)
+
+			wantSelectSQL := tc.wantExactSQL
+			if wantSelectSQL == "" {
+				stmt := &gorm.Statement{DB: db}
+				wantSelectSQL = fmt.Sprintf("SELECT * FROM %s LIMIT @p1", stmt.Quote(tc.tableNameForQuote))
+				rawSQL := fmt.Sprintf("SELECT * FROM %s LIMIT @p1", tc.tableNameForQuote)
+				if wantSelectSQL == rawSQL {
+					t.Fatalf("expected table name %q to be quoted, got raw SQL %q", tc.tableNameForQuote, wantSelectSQL)
+				}
+			}
+
+			if err := putSelectSingerRowResult(server, wantSelectSQL); err != nil {
+				t.Fatalf("PutStatementResult failed for select query: %v", err)
+			}
+			if err := putSingerColDetailsResult(server, spannerColDetailsSQL); err != nil {
+				t.Fatalf("PutStatementResult failed for column details query: %v", err)
+			}
+
+			cols, err := db.Migrator().ColumnTypes(tc.value)
+			if err != nil {
+				t.Fatalf("ColumnTypes(%v) failed: %v", tc.value, err)
+			}
+			if g, w := len(cols), 8; g != w {
+				t.Errorf("column count mismatch\nGot:  %v\nWant: %v", g, w)
+			}
+
+			reqs := drainRequestsFromServer(server.TestSpanner)
+			execReqs := requestsOfType(reqs, reflect.TypeOf(&spannerpb.ExecuteSqlRequest{}))
+			if g, w := len(execReqs), 2; g != w {
+				t.Fatalf("ExecuteSqlRequest count mismatch\nGot:  %v\nWant: %v", g, w)
+			}
+
+			selectReq := execReqs[0].(*spannerpb.ExecuteSqlRequest)
+			if g, w := selectReq.GetSql(), wantSelectSQL; g != w {
+				t.Errorf("select probe SQL mismatch\nGot:  %v\nWant: %v", g, w)
+			}
+			if !tc.skipSpanSQL {
+				parsedQuery, parseErr := spansql.ParseQuery(selectReq.GetSql())
+				if parseErr != nil {
+					t.Fatalf("spansql.ParseQuery failed for %q: %v", selectReq.GetSql(), parseErr)
+				}
+				if g, w := len(parsedQuery.Select.From), 1; g != w {
+					t.Errorf("parsed FROM count mismatch\nGot:  %v\nWant: %v", g, w)
+				}
+				if parsedQuery.Select.Where != nil {
+					t.Errorf("unexpected WHERE clause in parsed query %q: %v", selectReq.GetSql(), parsedQuery.Select.Where)
+				}
+			}
+
+			infoReq := execReqs[1].(*spannerpb.ExecuteSqlRequest)
+			if g, w := infoReq.GetSql(), spannerColDetailsSQL; g != w {
+				t.Errorf("information schema SQL mismatch\nGot:  %v\nWant: %v", g, w)
+			}
+			if g, w := infoReq.GetParams().GetFields()["p2"].GetStringValue(), tc.wantTableParam; g != w {
+				t.Errorf("information schema table param mismatch\nGot:  %v\nWant: %v", g, w)
+			}
+		})
+	}
+}
+
+func TestSpannerMigrator_ColumnTypes_EmptyTable(t *testing.T) {
+	t.Parallel()
+
+	db, server, teardown := setupTestGormConnection(t)
+	defer teardown()
+	drainRequestsFromServer(server.TestSpanner)
+
+	if _, err := db.Migrator().ColumnTypes(""); err == nil {
+		t.Fatal("expected error for empty table name, got nil")
+	}
+
+	reqs := drainRequestsFromServer(server.TestSpanner)
+	execReqs := requestsOfType(reqs, reflect.TypeOf(&spannerpb.ExecuteSqlRequest{}))
+	if g, w := len(execReqs), 0; g != w {
+		t.Errorf("ExecuteSqlRequest count mismatch\nGot:  %v\nWant: %v", g, w)
+	}
+}
+
+func TestSpannerMigrator_ColumnTypes_IgnoresPriorSessionClauses(t *testing.T) {
+	t.Parallel()
+
+	const selectSingerRow = "SELECT * FROM `singers` LIMIT @p1"
+
+	tests := []struct {
+		name    string
+		buildDB func(*gorm.DB) *gorm.DB
+	}{
+		{
+			name: "prior Table with vars, Where, and Select",
+			buildDB: func(db *gorm.DB) *gorm.DB {
+				return db.Table("singers WHERE ? = 1", 1).Where("active = ?", true).Select("id")
+			},
+		},
+		{
+			name: "prior Raw with vars",
+			buildDB: func(db *gorm.DB) *gorm.DB {
+				return db.Raw("SELECT ?", 99)
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			db, server, teardown := setupTestGormConnection(t)
+			defer teardown()
+			drainRequestsFromServer(server.TestSpanner)
+
+			if err := putSelectSingerRowResult(server, selectSingerRow); err != nil {
+				t.Fatalf("PutStatementResult failed for select query: %v", err)
+			}
+			if err := putSingerColDetailsResult(server, spannerColDetailsSQL); err != nil {
+				t.Fatalf("PutStatementResult failed for column details query: %v", err)
+			}
+
+			cols, err := tc.buildDB(db).Migrator().ColumnTypes(&singer{})
+			if err != nil {
+				t.Fatalf("ColumnTypes failed: %v", err)
+			}
+			if g, w := len(cols), 8; g != w {
+				t.Errorf("column count mismatch\nGot:  %v\nWant: %v", g, w)
+			}
+
+			reqs := drainRequestsFromServer(server.TestSpanner)
+			execReqs := requestsOfType(reqs, reflect.TypeOf(&spannerpb.ExecuteSqlRequest{}))
+			if g, w := len(execReqs), 2; g != w {
+				t.Fatalf("ExecuteSqlRequest count mismatch\nGot:  %v\nWant: %v", g, w)
+			}
+			if g, w := execReqs[0].(*spannerpb.ExecuteSqlRequest).GetSql(), selectSingerRow; g != w {
+				t.Errorf("select probe SQL mismatch\nGot:  %v\nWant: %v", g, w)
+			}
+			infoReq := execReqs[1].(*spannerpb.ExecuteSqlRequest)
+			if g, w := infoReq.GetSql(), spannerColDetailsSQL; g != w {
+				t.Errorf("information schema SQL mismatch\nGot:  %v\nWant: %v", g, w)
+			}
+			if g, w := infoReq.GetParams().GetFields()["p2"].GetStringValue(), "singers"; g != w {
+				t.Errorf("information schema table param mismatch\nGot:  %v\nWant: %v", g, w)
+			}
+		})
+	}
+}
+
+func TestSpannerMigrator_ColumnTypes_Errors(t *testing.T) {
+	t.Parallel()
+
+	const selectSingerRow = "SELECT * FROM `singers` LIMIT @p1"
+
+	tests := []struct {
+		name          string
+		value         interface{}
+		cancelContext bool
+		probeErr      error
+		infoSchemaErr error
+		wantCode      codes.Code
+		wantExecCount int
+	}{
+		{
+			name:          "nil value",
+			value:         nil,
+			wantExecCount: 0,
+		},
+		{
+			name:          "probe query fails on canceled context",
+			value:         &singer{},
+			cancelContext: true,
+			wantExecCount: 0,
+		},
+		{
+			name:          "probe query returns RPC error",
+			value:         &singer{},
+			probeErr:      status.Error(codes.InvalidArgument, "probe failed"),
+			wantCode:      codes.InvalidArgument,
+			wantExecCount: 1,
+		},
+		{
+			name:          "information schema query fails",
+			value:         &singer{},
+			infoSchemaErr: status.Error(codes.InvalidArgument, "info schema failed"),
+			wantCode:      codes.InvalidArgument,
+			wantExecCount: 2,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			db, server, teardown := setupTestGormConnection(t)
+			defer teardown()
+			drainRequestsFromServer(server.TestSpanner)
+
+			migratorDB := db
+			if tc.cancelContext {
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel()
+				migratorDB = db.WithContext(ctx)
+			} else if tc.probeErr != nil {
+				if err := server.TestSpanner.PutStatementResult(selectSingerRow, &testutil.StatementResult{
+					Type: testutil.StatementResultError,
+					Err:  tc.probeErr,
+				}); err != nil {
+					t.Fatalf("PutStatementResult failed for probe error: %v", err)
+				}
+			} else if tc.value != nil {
+				if err := putSelectSingerRowResult(server, selectSingerRow); err != nil {
+					t.Fatalf("PutStatementResult failed for select query: %v", err)
+				}
+			}
+
+			if tc.infoSchemaErr != nil {
+				if err := server.TestSpanner.PutStatementResult(spannerColDetailsSQL, &testutil.StatementResult{
+					Type: testutil.StatementResultError,
+					Err:  tc.infoSchemaErr,
+				}); err != nil {
+					t.Fatalf("PutStatementResult failed for info schema error: %v", err)
+				}
+			}
+
+			_, err := migratorDB.Migrator().ColumnTypes(tc.value)
+			if err == nil {
+				t.Fatal("expected error from ColumnTypes, got nil")
+			}
+			if tc.wantCode != codes.OK {
+				if g, w := spanner.ErrCode(err), tc.wantCode; g != w {
+					t.Fatalf("ColumnTypes error code mismatch\nGot:  %v (%v)\nWant: %v", g, err, w)
+				}
+			}
+
+			reqs := drainRequestsFromServer(server.TestSpanner)
+			execReqs := requestsOfType(reqs, reflect.TypeOf(&spannerpb.ExecuteSqlRequest{}))
+			if g, w := len(execReqs), tc.wantExecCount; g != w {
+				t.Errorf("ExecuteSqlRequest count mismatch\nGot:  %v\nWant: %v", g, w)
+			}
+		})
+	}
+}
+
+func TestSpannerMigrator_ColumnTypes_NonEmptyProbeRow(t *testing.T) {
+	t.Parallel()
+
+	const selectSingerRow = "SELECT * FROM `singers` LIMIT @p1"
+
+	db, server, teardown := setupTestGormConnection(t)
+	defer teardown()
+	drainRequestsFromServer(server.TestSpanner)
+
+	if err := server.TestSpanner.PutStatementResult(selectSingerRow, &testutil.StatementResult{
+		Type: testutil.StatementResultResultSet,
+		ResultSet: &spannerpb.ResultSet{
+			Metadata: &spannerpb.ResultSetMetadata{
+				RowType: &spannerpb.StructType{
+					Fields: []*spannerpb.StructType_Field{
+						{Type: &spannerpb.Type{Code: spannerpb.TypeCode_INT64}, Name: "id"},
+						{Type: &spannerpb.Type{Code: spannerpb.TypeCode_TIMESTAMP}, Name: "created_at"},
+						{Type: &spannerpb.Type{Code: spannerpb.TypeCode_TIMESTAMP}, Name: "updated_at"},
+						{Type: &spannerpb.Type{Code: spannerpb.TypeCode_TIMESTAMP}, Name: "deleted_at"},
+						{Type: &spannerpb.Type{Code: spannerpb.TypeCode_STRING}, Name: "first_name"},
+						{Type: &spannerpb.Type{Code: spannerpb.TypeCode_STRING}, Name: "last_name"},
+						{Type: &spannerpb.Type{Code: spannerpb.TypeCode_STRING}, Name: "full_name"},
+						{Type: &spannerpb.Type{Code: spannerpb.TypeCode_BOOL}, Name: "active"},
+					},
+				},
+			},
+			Rows: []*structpb.ListValue{
+				{Values: []*structpb.Value{
+					{Kind: &structpb.Value_StringValue{StringValue: "1"}},
+					{Kind: &structpb.Value_NullValue{}},
+					{Kind: &structpb.Value_NullValue{}},
+					{Kind: &structpb.Value_NullValue{}},
+					{Kind: &structpb.Value_StringValue{StringValue: "Alice"}},
+					{Kind: &structpb.Value_StringValue{StringValue: "Smith"}},
+					{Kind: &structpb.Value_StringValue{StringValue: "Alice Smith"}},
+					{Kind: &structpb.Value_BoolValue{BoolValue: true}},
+				}},
+			},
+		},
+	}); err != nil {
+		t.Fatalf("PutStatementResult failed for select query: %v", err)
+	}
+	if err := putSingerColDetailsResult(server, spannerColDetailsSQL); err != nil {
+		t.Fatalf("PutStatementResult failed for column details query: %v", err)
+	}
+
+	cols, err := db.Migrator().ColumnTypes(&singer{})
+	if err != nil {
+		t.Fatalf("ColumnTypes failed: %v", err)
+	}
+	if g, w := len(cols), 8; g != w {
+		t.Fatalf("column count mismatch\nGot:  %v\nWant: %v", g, w)
+	}
+	if cols[0].ScanType() == nil {
+		t.Error("expected SQLColumnType ScanType to be populated, got nil")
 	}
 }
 
