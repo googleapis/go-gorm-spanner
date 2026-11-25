@@ -23,7 +23,6 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/callbacks"
 	"gorm.io/gorm/clause"
-	"gorm.io/gorm/logger"
 	"gorm.io/gorm/migrator"
 	"gorm.io/gorm/schema"
 
@@ -256,7 +255,7 @@ func (dialector Dialector) QuoteTo(writer clause.Writer, str string) {
 }
 
 func (dialector Dialector) Explain(sql string, vars ...interface{}) string {
-	return logger.ExplainSQL(sql, nil, `'`, vars...)
+	return explainGoogleSQL(sql, vars...)
 }
 
 func (dialector Dialector) DataTypeOf(field *schema.Field) string {
