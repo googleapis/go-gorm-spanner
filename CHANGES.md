@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.10.4](https://github.com/googleapis/go-gorm-spanner/compare/v1.10.3...v1.10.4) (2026-11-25)
+
+
+### Bug Fixes
+
+* **postgresql:** Qualify schema when dropping table dependencies ([#281](https://github.com/googleapis/go-gorm-spanner/issues/281)) ([e78a33a](https://github.com/googleapis/go-gorm-spanner/commit/e78a33a9db4e059e25b9711589d80073489ff45f))
+* Quote sequence identifiers during table migration ([#273](https://github.com/googleapis/go-gorm-spanner/issues/273)) ([32417fd](https://github.com/googleapis/go-gorm-spanner/commit/32417fdd6ccbe1d4a7096afd487aa2dcfe0d99a4))
+* Safely quote table names in ColumnTypes queries ([#283](https://github.com/googleapis/go-gorm-spanner/issues/283)) ([74a8bf7](https://github.com/googleapis/go-gorm-spanner/commit/74a8bf762948961c5791f92f41d057ac9c9c2b6f))
+* Update all dependencies ([#261](https://github.com/googleapis/go-gorm-spanner/issues/261)) ([0fdf6b6](https://github.com/googleapis/go-gorm-spanner/commit/0fdf6b6ff44204f4906c7bf89fd95bb2e6279332))
+* Update all dependencies ([#277](https://github.com/googleapis/go-gorm-spanner/issues/277)) ([2ce0fdd](https://github.com/googleapis/go-gorm-spanner/commit/2ce0fdd7b541ce7f07a8aa2b0620baef1ab2c32e))
+* Update module cloud.google.com/go/spanner to v1.96.2 ([#278](https://github.com/googleapis/go-gorm-spanner/issues/278)) ([4c5a14c](https://github.com/googleapis/go-gorm-spanner/commit/4c5a14c59799ccc9153b9d037f329bcd3a46c38b))
+* Update module google.golang.org/api to v0.317.0 ([#282](https://github.com/googleapis/go-gorm-spanner/issues/282)) ([d47456c](https://github.com/googleapis/go-gorm-spanner/commit/d47456c5c329c857724294c8abd1efef44ebf376))
+* Use GoogleSQL escaping and placeholder scanning in Explain ([#272](https://github.com/googleapis/go-gorm-spanner/issues/272)) ([8ddb74f](https://github.com/googleapis/go-gorm-spanner/commit/8ddb74f3c560ecd59e69b74781f87af79a4061cd))
+
 ## [1.10.3](https://github.com/googleapis/go-gorm-spanner/compare/v1.10.2...v1.10.3) (2026-11-13)
 
 
