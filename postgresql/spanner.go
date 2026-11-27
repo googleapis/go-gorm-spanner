@@ -133,12 +133,32 @@ func AutoOrderBy(db *gorm.DB) {
 			return
 		}
 
+		// TODO: Dialector currently delegates QuoteTo to gorm.io/driver/postgres, which has
+		// quoting edge-case bugs (such as identifiers starting with "" and int8 length overflow).
+		// Overriding QuoteTo for Spanner PostgreSQL is deferred to a separate pull request.
+		orderByColumns := make([]clause.OrderByColumn, 0, len(db.Statement.Schema.PrimaryFields))
 		for _, pk := range db.Statement.Schema.PrimaryFields {
-			if pk.AutoIncrement {
-				db.Statement.Order(fmt.Sprintf(`spanner.bit_reverse("%s"."%s", true)`, db.Statement.Table, pk.DBName))
-			} else {
-				db.Statement.Order(pk.DBName)
+			if pk.DBName == "" {
+				continue
 			}
+			// Quote the table and column names directly as strings instead of using clause.Column,
+			// because clause.Column treats GORM's internal placeholder values (clause.CurrentTable
+			// and clause.PrimaryKey) as special substitutions rather than literal names.
+			orderExpr := db.Statement.Quote(pk.DBName)
+			if pk.AutoIncrement {
+				if db.Statement.Table != "" {
+					orderExpr = db.Statement.Quote(db.Statement.Table) + "." + orderExpr
+				}
+				orderExpr = fmt.Sprintf("spanner.bit_reverse(%s, true)", orderExpr)
+			}
+			orderByColumns = append(orderByColumns, clause.OrderByColumn{
+				Column: clause.Column{Name: orderExpr, Raw: true},
+			})
+		}
+		if len(orderByColumns) > 0 {
+			db.Statement.AddClause(clause.OrderBy{
+				Columns: orderByColumns,
+			})
 		}
 	}
 }
