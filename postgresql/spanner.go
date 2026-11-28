@@ -21,6 +21,7 @@ import (
 	"math"
 	"runtime"
 
+	"github.com/googleapis/go-gorm-spanner/internal/callbacks"
 	_ "github.com/googleapis/go-sql-spanner"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -161,13 +162,7 @@ func isTopLevelStatement() bool {
 }
 
 func BeforeUpdate(db *gorm.DB) {
-	if db.Statement != nil && db.Statement.Schema != nil && db.Statement.Schema.PrimaryFieldDBNames != nil {
-		omits := make([]string, 0, len(db.Statement.Omits)+len(db.Statement.Schema.PrimaryFieldDBNames))
-		omits = append(omits, db.Statement.Omits...)
-		omits = append(omits, db.Statement.Schema.PrimaryFieldDBNames...)
-		// Omit all primary key fields from the SET clause of an UPDATE statement.
-		db.Statement.Omit(omits...)
-	}
+	callbacks.BeforeUpdate(db)
 }
 
 const (

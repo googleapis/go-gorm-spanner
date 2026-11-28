@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 	"reflect"
+	"slices"
 	"strconv"
 	"testing"
 
@@ -31,6 +32,7 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+	"gorm.io/gorm/schema"
 )
 
 type entity struct {
@@ -377,6 +379,527 @@ func TestLastStatement(t *testing.T) {
 	request := getLastSqlRequest(server)
 	if !request.LastStatement {
 		t.Fatalf("last statement mismatch\n Got: %v\nWant: %v", request.LastStatement, true)
+	}
+}
+
+type accountUser struct {
+	ID      int64 `gorm:"primaryKey"`
+	Name    string
+	Role    string
+	IsAdmin bool
+}
+
+type hookUser struct {
+	ID   int64 `gorm:"primaryKey"`
+	Name string
+	Role string
+}
+
+func (*hookUser) BeforeUpdate(tx *gorm.DB) error {
+	tx.Statement.Omit("role")
+	return nil
+}
+
+type parentRecord struct {
+	ID       int64 `gorm:"primaryKey"`
+	Name     string
+	Children []childRecord `gorm:"foreignKey:ParentID"`
+}
+
+type childRecord struct {
+	ID       int64 `gorm:"primaryKey"`
+	Name     string
+	ParentID int64
+}
+
+func TestBeforeUpdate_PreservesOmit(t *testing.T) {
+	t.Parallel()
+
+	wantSQL := "UPDATE `account_users` SET `name`=@p1 WHERE `id` = @p2"
+
+	tests := []struct {
+		name string
+		run  func(db *gorm.DB) error
+	}{
+		{
+			name: "map update with multi-arg Omit",
+			run: func(db *gorm.DB) error {
+				u := accountUser{ID: 1}
+				return db.Model(&u).Omit("role", "is_admin").Updates(map[string]interface{}{
+					"id":       999,
+					"name":     "alice",
+					"role":     "admin",
+					"is_admin": true,
+				}).Error
+			},
+		},
+		{
+			name: "struct update with multi-arg Omit",
+			run: func(db *gorm.DB) error {
+				u := accountUser{ID: 1}
+				return db.Model(&u).Omit("role", "is_admin").Updates(accountUser{
+					ID:      999,
+					Name:    "alice",
+					Role:    "admin",
+					IsAdmin: true,
+				}).Error
+			},
+		},
+		{
+			name: "map update with comma-separated Omit",
+			run: func(db *gorm.DB) error {
+				u := accountUser{ID: 1}
+				return db.Model(&u).Omit("role,is_admin").Updates(map[string]interface{}{
+					"id":       999,
+					"name":     "alice",
+					"role":     "admin",
+					"is_admin": true,
+				}).Error
+			},
+		},
+		{
+			name: "map update with Go field names in Omit",
+			run: func(db *gorm.DB) error {
+				u := accountUser{ID: 1}
+				return db.Model(&u).Omit("Role", "IsAdmin").Updates(map[string]interface{}{
+					"id":       999,
+					"name":     "alice",
+					"role":     "admin",
+					"is_admin": true,
+				}).Error
+			},
+		},
+		{
+			name: "map update when Omit already includes primary key",
+			run: func(db *gorm.DB) error {
+				u := accountUser{ID: 1}
+				return db.Model(&u).Omit("id", "role", "is_admin").Updates(map[string]interface{}{
+					"id":       999,
+					"name":     "alice",
+					"role":     "admin",
+					"is_admin": true,
+				}).Error
+			},
+		},
+		{
+			name: "UpdateColumns with Omit",
+			run: func(db *gorm.DB) error {
+				u := accountUser{ID: 1}
+				return db.Model(&u).Omit("role", "is_admin").UpdateColumns(map[string]interface{}{
+					"id":       999,
+					"name":     "alice",
+					"role":     "admin",
+					"is_admin": true,
+				}).Error
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			db, server, teardown := setupTestGormConnection(t)
+			defer teardown()
+
+			if err := server.TestSpanner.PutStatementResult(wantSQL, &testutil.StatementResult{
+				Type:        testutil.StatementResultUpdateCount,
+				UpdateCount: 1,
+			}); err != nil {
+				t.Fatalf("failed to register statement result: %v", err)
+			}
+
+			if err := tc.run(db); err != nil {
+				t.Fatalf("update failed: %v", err)
+			}
+
+			req := getLastSqlRequest(server)
+			if g, w := req.Sql, wantSQL; g != w {
+				t.Errorf("SQL mismatch\nGot:  %v\nWant: %v", g, w)
+			}
+			if g, w := len(req.Params.Fields), 2; g != w {
+				t.Errorf("param count mismatch\nGot:  %v\nWant: %v", g, w)
+			}
+			if g, w := req.Params.Fields["p1"].GetStringValue(), "alice"; g != w {
+				t.Errorf("name param mismatch\nGot:  %v\nWant: %v", g, w)
+			}
+			if g, w := req.Params.Fields["p2"].GetStringValue(), "1"; g != w {
+				t.Errorf("where id param mismatch\nGot:  %v\nWant: %v", g, w)
+			}
+		})
+	}
+}
+
+type compositePKUser struct {
+	TenantID int64 `gorm:"primaryKey"`
+	ID       int64 `gorm:"primaryKey"`
+	Name     string
+	Role     string
+}
+
+func TestBeforeUpdate_CompositePrimaryKey(t *testing.T) {
+	t.Parallel()
+
+	db, server, teardown := setupTestGormConnection(t)
+	defer teardown()
+
+	wantSQL := "UPDATE `composite_pk_users` SET `name`=@p1 WHERE `tenant_id` = @p2 AND `id` = @p3"
+	if err := server.TestSpanner.PutStatementResult(wantSQL, &testutil.StatementResult{
+		Type:        testutil.StatementResultUpdateCount,
+		UpdateCount: 1,
+	}); err != nil {
+		t.Fatalf("failed to register statement result: %v", err)
+	}
+
+	u := compositePKUser{TenantID: 10, ID: 1}
+	if err := db.Model(&u).Omit("role").Updates(map[string]interface{}{
+		"tenant_id": 999,
+		"id":        999,
+		"name":      "alice",
+		"role":      "admin",
+	}).Error; err != nil {
+		t.Fatalf("update failed: %v", err)
+	}
+
+	req := getLastSqlRequest(server)
+	if g, w := req.Sql, wantSQL; g != w {
+		t.Errorf("SQL mismatch\nGot:  %v\nWant: %v", g, w)
+	}
+	if g, w := len(req.Params.Fields), 3; g != w {
+		t.Errorf("param count mismatch\nGot:  %v\nWant: %v", g, w)
+	}
+}
+
+func TestBeforeUpdate_NoOpUpdates(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		run  func(db *gorm.DB) error
+	}{
+		{
+			name: "single omitted column update",
+			run: func(db *gorm.DB) error {
+				u := accountUser{ID: 1}
+				return db.Model(&u).Omit("role").Update("role", "admin").Error
+			},
+		},
+		{
+			name: "direct primary key update",
+			run: func(db *gorm.DB) error {
+				u := accountUser{ID: 1}
+				return db.Model(&u).Update("id", 999).Error
+			},
+		},
+		{
+			name: "map update with only primary key and omitted columns",
+			run: func(db *gorm.DB) error {
+				u := accountUser{ID: 1}
+				return db.Model(&u).Omit("role").Updates(map[string]interface{}{
+					"id":   999,
+					"role": "admin",
+				}).Error
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			db, server, teardown := setupTestGormConnection(t)
+			defer teardown()
+			drainRequestsFromServer(server.TestSpanner)
+
+			if err := tc.run(db); err != nil {
+				t.Fatalf("update failed: %v", err)
+			}
+
+			reqs := drainRequestsFromServer(server.TestSpanner)
+			execReqs := requestsOfType(reqs, reflect.TypeOf(&spannerpb.ExecuteSqlRequest{}))
+			if g, w := len(execReqs), 0; g != w {
+				t.Errorf("execute request count mismatch\nGot:  %v\nWant: %v", g, w)
+			}
+		})
+	}
+}
+
+func TestBeforeUpdate_OmitAssociations(t *testing.T) {
+	t.Parallel()
+
+	db, server, teardown := setupTestGormConnection(t)
+	defer teardown()
+	drainRequestsFromServer(server.TestSpanner)
+
+	wantSQL := "UPDATE `parent_records` SET `name`=@p1 WHERE `id` = @p2"
+	if err := server.TestSpanner.PutStatementResult(wantSQL, &testutil.StatementResult{
+		Type:        testutil.StatementResultUpdateCount,
+		UpdateCount: 1,
+	}); err != nil {
+		t.Fatalf("failed to register statement result: %v", err)
+	}
+
+	p := parentRecord{
+		ID:       1,
+		Name:     "updated",
+		Children: []childRecord{{ID: 10, Name: "child"}},
+	}
+	if err := db.Omit(clause.Associations).Updates(&p).Error; err != nil {
+		t.Fatalf("update failed: %v", err)
+	}
+
+	reqs := drainRequestsFromServer(server.TestSpanner)
+	execReqs := requestsOfType(reqs, reflect.TypeOf(&spannerpb.ExecuteSqlRequest{}))
+	if g, w := len(execReqs), 1; g != w {
+		t.Fatalf("execute request count mismatch\nGot:  %v\nWant: %v", g, w)
+	}
+	if g, w := execReqs[0].(*spannerpb.ExecuteSqlRequest).Sql, wantSQL; g != w {
+		t.Errorf("SQL mismatch\nGot:  %v\nWant: %v", g, w)
+	}
+}
+
+func TestBeforeUpdate_ModelHookOmit(t *testing.T) {
+	t.Parallel()
+
+	db, server, teardown := setupTestGormConnection(t)
+	defer teardown()
+
+	wantSQL := "UPDATE `hook_users` SET `name`=@p1 WHERE `id` = @p2"
+	if err := server.TestSpanner.PutStatementResult(wantSQL, &testutil.StatementResult{
+		Type:        testutil.StatementResultUpdateCount,
+		UpdateCount: 1,
+	}); err != nil {
+		t.Fatalf("failed to register statement result: %v", err)
+	}
+
+	u := hookUser{ID: 1}
+	if err := db.Model(&u).Updates(map[string]interface{}{
+		"id":   999,
+		"name": "alice",
+		"role": "admin",
+	}).Error; err != nil {
+		t.Fatalf("update failed: %v", err)
+	}
+
+	req := getLastSqlRequest(server)
+	if g, w := req.Sql, wantSQL; g != w {
+		t.Errorf("SQL mismatch\nGot:  %v\nWant: %v", g, w)
+	}
+}
+
+func TestBeforeUpdate_SelectStillOmitsPrimaryKey(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		selects []string
+		omits   []string
+		wantSQL string
+	}{
+		{
+			name:    "Select wildcard",
+			selects: []string{"*"},
+			wantSQL: "UPDATE `account_users` SET `name`=@p1,`role`=@p2,`is_admin`=@p3 WHERE `id` = @p4",
+		},
+		{
+			name:    "Select explicitly includes primary key",
+			selects: []string{"id", "name"},
+			wantSQL: "UPDATE `account_users` SET `name`=@p1 WHERE `id` = @p2",
+		},
+		{
+			name:    "Select wildcard with Omit",
+			selects: []string{"*"},
+			omits:   []string{"role"},
+			wantSQL: "UPDATE `account_users` SET `name`=@p1,`is_admin`=@p2 WHERE `id` = @p3",
+		},
+		{
+			name:    "Select columns with Omit",
+			selects: []string{"id", "name", "role"},
+			omits:   []string{"role"},
+			wantSQL: "UPDATE `account_users` SET `name`=@p1 WHERE `id` = @p2",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			db, server, teardown := setupTestGormConnection(t)
+			defer teardown()
+
+			if err := server.TestSpanner.PutStatementResult(tc.wantSQL, &testutil.StatementResult{
+				Type:        testutil.StatementResultUpdateCount,
+				UpdateCount: 1,
+			}); err != nil {
+				t.Fatalf("failed to register statement result: %v", err)
+			}
+
+			u := accountUser{ID: 1}
+			tx := db.Model(&u).Select(tc.selects)
+			if len(tc.omits) > 0 {
+				tx = tx.Omit(tc.omits...)
+			}
+			if err := tx.Updates(accountUser{ID: 999, Name: "alice", Role: "member", IsAdmin: false}).Error; err != nil {
+				t.Fatalf("update failed: %v", err)
+			}
+
+			req := getLastSqlRequest(server)
+			if g, w := req.Sql, tc.wantSQL; g != w {
+				t.Errorf("SQL mismatch\nGot:  %v\nWant: %v", g, w)
+			}
+		})
+	}
+}
+
+func TestBeforeUpdate_SaveWithOmit(t *testing.T) {
+	t.Parallel()
+
+	db, server, teardown := setupTestGormConnection(t)
+	defer teardown()
+	drainRequestsFromServer(server.TestSpanner)
+
+	updateSQL := "UPDATE `account_users` SET `name`=@p1,`is_admin`=@p2 WHERE `id` = @p3"
+	insertSQL := "INSERT OR UPDATE INTO `account_users` (`name`,`is_admin`,`id`) VALUES (@p1,@p2,@p3) THEN RETURN `id`"
+	if err := server.TestSpanner.PutStatementResult(updateSQL, &testutil.StatementResult{
+		Type:        testutil.StatementResultUpdateCount,
+		UpdateCount: 0,
+	}); err != nil {
+		t.Fatalf("failed to register update result: %v", err)
+	}
+	if err := server.TestSpanner.PutStatementResult(insertSQL, &testutil.StatementResult{
+		Type: testutil.StatementResultResultSet,
+		ResultSet: &spannerpb.ResultSet{
+			Metadata: &spannerpb.ResultSetMetadata{
+				RowType: &spannerpb.StructType{
+					Fields: []*spannerpb.StructType_Field{
+						{Type: &spannerpb.Type{Code: spannerpb.TypeCode_INT64}, Name: "id"},
+					},
+				},
+			},
+			Rows: []*structpb.ListValue{
+				{Values: []*structpb.Value{
+					{Kind: &structpb.Value_StringValue{StringValue: "42"}},
+				}},
+			},
+		},
+	}); err != nil {
+		t.Fatalf("failed to register insert result: %v", err)
+	}
+
+	u := accountUser{ID: 42, Name: "alice", Role: "admin", IsAdmin: true}
+	if err := db.Omit("role").Save(&u).Error; err != nil {
+		t.Fatalf("save failed: %v", err)
+	}
+
+	reqs := drainRequestsFromServer(server.TestSpanner)
+	execReqs := requestsOfType(reqs, reflect.TypeOf(&spannerpb.ExecuteSqlRequest{}))
+	if g, w := len(execReqs), 2; g != w {
+		t.Fatalf("execute request count mismatch\nGot:  %v\nWant: %v", g, w)
+	}
+	if g, w := execReqs[0].(*spannerpb.ExecuteSqlRequest).Sql, updateSQL; g != w {
+		t.Errorf("update SQL mismatch\nGot:  %v\nWant: %v", g, w)
+	}
+	if g, w := execReqs[1].(*spannerpb.ExecuteSqlRequest).Sql, insertSQL; g != w {
+		t.Errorf("fallback insert SQL mismatch\nGot:  %v\nWant: %v", g, w)
+	}
+}
+
+func TestBeforeUpdate_SessionReusePreservesBaseOmits(t *testing.T) {
+	t.Parallel()
+
+	db, server, teardown := setupTestGormConnection(t)
+	defer teardown()
+
+	updateSQL := "UPDATE `account_users` SET `name`=@p1 WHERE `id` = @p2"
+	insertSQL := "INSERT INTO `account_users` (`name`,`is_admin`,`id`) VALUES (@p1,@p2,@p3) THEN RETURN `id`"
+	if err := server.TestSpanner.PutStatementResult(updateSQL, &testutil.StatementResult{
+		Type:        testutil.StatementResultUpdateCount,
+		UpdateCount: 1,
+	}); err != nil {
+		t.Fatalf("failed to register update result: %v", err)
+	}
+	if err := server.TestSpanner.PutStatementResult(insertSQL, &testutil.StatementResult{
+		Type: testutil.StatementResultResultSet,
+		ResultSet: &spannerpb.ResultSet{
+			Metadata: &spannerpb.ResultSetMetadata{
+				RowType: &spannerpb.StructType{
+					Fields: []*spannerpb.StructType_Field{
+						{Type: &spannerpb.Type{Code: spannerpb.TypeCode_INT64}, Name: "id"},
+					},
+				},
+			},
+			Rows: []*structpb.ListValue{
+				{Values: []*structpb.Value{
+					{Kind: &structpb.Value_StringValue{StringValue: "42"}},
+				}},
+			},
+		},
+	}); err != nil {
+		t.Fatalf("failed to register insert result: %v", err)
+	}
+
+	base := db.Omit("role").Session(&gorm.Session{})
+	existing := accountUser{ID: 1}
+	if err := base.Model(&existing).Updates(map[string]interface{}{
+		"id":   999,
+		"name": "alice",
+		"role": "admin",
+	}).Error; err != nil {
+		t.Fatalf("update failed: %v", err)
+	}
+	if g, w := getLastSql(server), updateSQL; g != w {
+		t.Errorf("update SQL mismatch\nGot:  %v\nWant: %v", g, w)
+	}
+
+	// Reusing base session for Create must still include primary key `id` while omitting `role`.
+	created := accountUser{ID: 42, Name: "bob", Role: "admin", IsAdmin: true}
+	if err := base.Create(&created).Error; err != nil {
+		t.Fatalf("create failed: %v", err)
+	}
+	if g, w := getLastSql(server), insertSQL; g != w {
+		t.Errorf("create SQL mismatch\nGot:  %v\nWant: %v", g, w)
+	}
+}
+
+func TestBeforeUpdate_TableWithoutSchema(t *testing.T) {
+	t.Parallel()
+
+	db, server, teardown := setupTestGormConnection(t)
+	defer teardown()
+
+	wantSQL := "UPDATE `account_users` SET `name`=@p1 WHERE id = @p2"
+	if err := server.TestSpanner.PutStatementResult(wantSQL, &testutil.StatementResult{
+		Type:        testutil.StatementResultUpdateCount,
+		UpdateCount: 1,
+	}); err != nil {
+		t.Fatalf("failed to register statement result: %v", err)
+	}
+
+	if err := db.Table("account_users").Where("id = ?", 1).Update("name", "alice").Error; err != nil {
+		t.Fatalf("table update failed: %v", err)
+	}
+	if g, w := getLastSql(server), wantSQL; g != w {
+		t.Errorf("table Update SQL mismatch\nGot:  %v\nWant: %v", g, w)
+	}
+
+	if err := db.Table("account_users").Omit("role").Where("id = ?", 1).Updates(map[string]interface{}{
+		"name": "alice",
+		"role": "admin",
+	}).Error; err != nil {
+		t.Fatalf("table Updates with Omit failed: %v", err)
+	}
+	if g, w := getLastSql(server), wantSQL; g != w {
+		t.Errorf("table Updates SQL mismatch\nGot:  %v\nWant: %v", g, w)
+	}
+}
+
+func TestBeforeUpdate_DelegatesToInternal(t *testing.T) {
+	t.Parallel()
+
+	BeforeUpdate(nil)
+	stmt := &gorm.Statement{
+		Omits: []string{"role"},
+		Schema: &schema.Schema{
+			PrimaryFieldDBNames: []string{"id"},
+		},
+	}
+	BeforeUpdate(&gorm.DB{Statement: stmt})
+	if g, w := stmt.Omits, []string{"role", "id"}; !slices.Equal(g, w) {
+		t.Errorf("Omits mismatch\nGot:  %v\nWant: %v", g, w)
 	}
 }
 
